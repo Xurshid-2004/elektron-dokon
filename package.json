@@ -5,6 +5,7 @@
     "description": "Sifatli kiyimlar — premium online kiyim do'koni",
     "scripts": {
         "dev": "npx serve . -p 3000",
+        "build": "node -e \"console.log('Static site ready')\"",
         "deploy:rules": "firebase deploy --only firestore:rules,storage"
     }
 }
