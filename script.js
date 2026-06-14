@@ -67,6 +67,7 @@ function boot() {
     bootAdminTriggers();
     showProductsLoading();
     syncProductsSheetVisibility("products");
+    initProductsSheetForViewport();
 
     try {
         initFirebase();
@@ -108,6 +109,7 @@ function onAdminLoggedIn() {
     if (typeof window.switchAdminSection === "function") {
         window.switchAdminSection("products");
     }
+    initProductsSheetForViewport();
     renderStats();
     renderAdminProducts();
 }
@@ -317,6 +319,7 @@ function bindEvents() {
         if (window.innerWidth > 860) {
             closeAdminSidebar();
         }
+        initProductsSheetForViewport();
     });
     bindById("cancelEditBtn", "click", cancelEditProduct);
 
@@ -615,8 +618,8 @@ function renderAdminProducts() {
         const shortId = (product.id || "").slice(0, 8);
 
         row.innerHTML = `
-            <td><code style="font-size:12px; font-weight:800; color:var(--emerald);" title="${escapeHtml(product.id)}">${escapeHtml(shortId)}...</code></td>
-            <td>
+            <td data-label="ID"><code style="font-size:12px; font-weight:800; color:var(--emerald);" title="${escapeHtml(product.id)}">${escapeHtml(shortId)}...</code></td>
+            <td data-label="Mahsulot">
                 <div class="table-product">
                     ${product.imageUrl
                         ? `<img class="table-thumb" src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.name)}" onerror="this.style.background='linear-gradient(135deg,#1b1a22,#126c5b)'; this.removeAttribute('src');">`
@@ -627,10 +630,10 @@ function renderAdminProducts() {
                     </div>
                 </div>
             </td>
-            <td>${escapeHtml(formatPrice(product.price))}</td>
-            <td>${escapeHtml(product.category || "-")}</td>
-            <td><span class="badge ${isAvailable ? "available" : "sold-out"}">${isAvailable ? "Mavjud" : "Tugagan"}</span></td>
-            <td>
+            <td data-label="Narxi">${escapeHtml(formatPrice(product.price))}</td>
+            <td data-label="Kategoriya">${escapeHtml(product.category || "-")}</td>
+            <td data-label="Status"><span class="badge ${isAvailable ? "available" : "sold-out"}">${isAvailable ? "Mavjud" : "Tugagan"}</span></td>
+            <td data-label="Amallar">
                 <div class="table-actions">
                     <button class="btn sm table-action-btn edit-btn" type="button" data-edit-id="${escapeHtml(product.id)}" aria-label="Tahrirlash" title="Tahrirlash">
                         Tahrirlash
@@ -676,11 +679,11 @@ function renderOrders() {
     orders.forEach((order) => {
         const row = document.createElement("tr");
         row.innerHTML = `
-            <td><strong>${escapeHtml(order.productName || "-")}</strong></td>
-            <td>${escapeHtml(formatPrice(order.productPrice))}</td>
-            <td><a href="tel:${escapeHtml(order.customerPhone || "")}" style="color:var(--emerald); font-weight:800;">${escapeHtml(order.customerPhone || "-")}</a></td>
-            <td>${escapeHtml(formatDate(order.createdAt))}</td>
-            <td>
+            <td data-label="Mahsulot"><strong>${escapeHtml(order.productName || "-")}</strong></td>
+            <td data-label="Narxi">${escapeHtml(formatPrice(order.productPrice))}</td>
+            <td data-label="Telefon"><a href="tel:${escapeHtml(order.customerPhone || "")}" style="color:var(--emerald); font-weight:800;">${escapeHtml(order.customerPhone || "-")}</a></td>
+            <td data-label="Vaqt">${escapeHtml(formatDate(order.createdAt))}</td>
+            <td data-label="Amal">
                 <button class="icon-btn danger" type="button" data-delete-order="${escapeHtml(order.id)}" aria-label="Zakazni o'chirish" title="O'chirish">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                 </button>
@@ -1436,6 +1439,18 @@ function toggleProductsSheet() {
     if (elements.adminProductsSheet.classList.contains("is-expanded")) {
         collapseProductsSheet();
     } else {
+        expandProductsSheet();
+    }
+}
+
+function initProductsSheetForViewport() {
+    if (!elements.adminProductsSheet || elements.adminProductsSheet.classList.contains("is-hidden")) {
+        return;
+    }
+
+    if (window.innerWidth <= 860) {
+        collapseProductsSheet();
+    } else if (!elements.adminProductsSheet.classList.contains("is-collapsed")) {
         expandProductsSheet();
     }
 }
