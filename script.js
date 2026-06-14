@@ -66,6 +66,7 @@ function boot() {
 
     bootAdminTriggers();
     showProductsLoading();
+    syncProductsSheetVisibility("products");
 
     try {
         initFirebase();
@@ -91,6 +92,7 @@ function boot() {
 function publishAppApi() {
     window.addProduct = addProduct;
     window.updateProduct = updateProduct;
+    window.startEditProduct = startEditProduct;
     window.showToast = showToast;
     window.getFirebaseStatus = function () {
         return {
@@ -180,6 +182,9 @@ function cacheElements() {
         adminDashboard: document.getElementById("adminDashboard"),
         adminSidebar: document.getElementById("adminSidebar"),
         adminSidebarOverlay: document.getElementById("adminSidebarOverlay"),
+        adminProductsSheet: document.getElementById("adminProductsSheet"),
+        adminProductsSheetToggle: document.getElementById("adminProductsSheetToggle"),
+        adminProductsCount: document.getElementById("adminProductsCount"),
         loginForm: document.getElementById("loginForm"),
         productForm: document.getElementById("productForm"),
         editForm: document.getElementById("editForm"),
@@ -304,6 +309,8 @@ function bindEvents() {
     });
     bindById("sidebarToggleBtn", "click", () => toggleSidebar());
     bindById("sidebarCloseBtn", "click", () => closeAdminSidebar());
+    bindById("adminProductsSheetToggle", "click", toggleProductsSheet);
+    bindById("saveEditBtn", "click", (event) => updateProduct(event));
     elements.adminSidebarOverlay?.addEventListener("click", closeAdminSidebar);
 
     window.addEventListener("resize", () => {
@@ -585,6 +592,10 @@ function renderAdminProducts() {
     if (!elements.adminProductsTable) return;
 
     const filtered = getFilteredProducts();
+    if (elements.adminProductsCount) {
+        elements.adminProductsCount.textContent = `${filtered.length} ta`;
+    }
+
     elements.adminProductsTable.innerHTML = "";
 
     if (filtered.length === 0) {
@@ -621,8 +632,8 @@ function renderAdminProducts() {
             <td><span class="badge ${isAvailable ? "available" : "sold-out"}">${isAvailable ? "Mavjud" : "Tugagan"}</span></td>
             <td>
                 <div class="table-actions">
-                    <button class="btn sm secondary table-action-btn" type="button" data-edit-id="${escapeHtml(product.id)}" aria-label="Tahrirlash" title="Tahrirlash">
-                        Tahrir
+                    <button class="btn sm table-action-btn edit-btn" type="button" data-edit-id="${escapeHtml(product.id)}" aria-label="Tahrirlash" title="Tahrirlash">
+                        Tahrirlash
                     </button>
                     <button class="btn sm danger table-action-btn" type="button" data-delete-product="${escapeHtml(product.id)}" aria-label="O'chirish" title="O'chirish">
                         O'chir
@@ -735,6 +746,7 @@ async function addProduct(event) {
         log("Mahsulot Firestore ga saqlandi, auto ID:", autoId);
         resetProductForm();
         switchAdminSection("products");
+        expandProductsSheet();
         showToast(`Mahsulot saqlandi (ID: ${autoId.slice(0, 8)}...)`, "success");
     } catch (error) {
         console.error("Mahsulot qo'shishda xatolik:", error);
@@ -1378,7 +1390,57 @@ function switchAdminSection(sectionName) {
 
     elements.adminSidebar?.classList.remove("open");
     syncAdminSidebarState(false);
+    syncProductsSheetVisibility(sectionName);
 }
+
+function syncProductsSheetVisibility(sectionName) {
+    const sheet = elements.adminProductsSheet;
+    const content = document.querySelector(".admin-content");
+    if (!sheet) return;
+
+    const show = sectionName === "products";
+    sheet.classList.toggle("is-hidden", !show);
+
+    if (content) {
+        content.classList.toggle("admin-content--with-sheet", show);
+        content.classList.toggle("sheet-expanded", show && sheet.classList.contains("is-expanded"));
+    }
+}
+
+function expandProductsSheet() {
+    const sheet = elements.adminProductsSheet;
+    const toggle = elements.adminProductsSheetToggle;
+    const content = document.querySelector(".admin-content");
+    if (!sheet) return;
+
+    sheet.classList.remove("is-collapsed");
+    sheet.classList.add("is-expanded");
+    if (toggle) toggle.setAttribute("aria-expanded", "true");
+    if (content) content.classList.add("sheet-expanded");
+}
+
+function collapseProductsSheet() {
+    const sheet = elements.adminProductsSheet;
+    const toggle = elements.adminProductsSheetToggle;
+    const content = document.querySelector(".admin-content");
+    if (!sheet) return;
+
+    sheet.classList.remove("is-expanded");
+    sheet.classList.add("is-collapsed");
+    if (toggle) toggle.setAttribute("aria-expanded", "false");
+    if (content) content.classList.remove("sheet-expanded");
+}
+
+function toggleProductsSheet() {
+    if (!elements.adminProductsSheet) return;
+    if (elements.adminProductsSheet.classList.contains("is-expanded")) {
+        collapseProductsSheet();
+    } else {
+        expandProductsSheet();
+    }
+}
+
+window.toggleProductsSheet = toggleProductsSheet;
 
 window.switchAdminSection = switchAdminSection;
 
