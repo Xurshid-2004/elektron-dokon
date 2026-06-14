@@ -822,7 +822,29 @@
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
             gap: 10px;
-            align-items: center;
+            align-items: start;
+        }
+
+        .image-source-input {
+            width: 100%;
+            min-height: 42px;
+            max-height: 88px;
+            resize: vertical;
+            border: 1px solid rgba(23, 21, 29, 0.16);
+            border-radius: var(--radius);
+            background: #fffdfa;
+            color: var(--ink);
+            outline: none;
+            padding: 10px 12px;
+            font-size: 12px;
+            line-height: 1.4;
+            word-break: break-all;
+        }
+
+        .image-source-input:focus {
+            background: #fff;
+            border-color: rgba(18, 108, 91, 0.72);
+            box-shadow: 0 0 0 4px rgba(18, 108, 91, 0.11);
         }
 
         .image-preview {
@@ -1777,12 +1799,12 @@
                         <div class="form-field full">
                             <label for="editImage">Mahsulot rasmi (ixtiyoriy)</label>
                             <div class="image-upload-row">
-                                <input type="text" id="editImage" placeholder="https://... yoki Ctrl+V bilan rasm">
+                                <textarea class="image-source-input" id="editImage" rows="2" placeholder="Google: Rasm URL nusxasi yoki https://..."></textarea>
                                 <input type="file" id="editImageFile" accept="image/*" hidden>
                                 <button class="btn sm secondary" type="button" id="editImagePickBtn">Rasm tanlash</button>
                             </div>
                             <img id="editImagePreview" class="image-preview" alt="Rasm ko'rinishi" hidden>
-                            <small class="field-hint">Internet havolasi, fayl yoki nusxalangan rasm (Ctrl+V) avtomatik saqlanadi</small>
+                            <small class="field-hint">Google rasmda o'ng tugma → "Rasm URL nusxasi" → Ctrl+V. Avtomatik Firebase ga yuklanadi.</small>
                         </div>
                         <div class="form-field full">
                             <label for="editDescription">Tavsif</label>
@@ -1931,12 +1953,12 @@
                                             <div class="form-field full">
                                                 <label for="productImage">Mahsulot rasmi (ixtiyoriy)</label>
                                                 <div class="image-upload-row">
-                                                    <input type="text" id="productImage" placeholder="https://... yoki Ctrl+V bilan rasm">
+                                                    <textarea class="image-source-input" id="productImage" rows="2" placeholder="Google: Rasm URL nusxasi yoki https://..."></textarea>
                                                     <input type="file" id="productImageFile" accept="image/*" hidden>
                                                     <button class="btn sm secondary" type="button" id="productImagePickBtn">Rasm tanlash</button>
                                                 </div>
                                                 <img id="productImagePreview" class="image-preview" alt="Rasm ko'rinishi" hidden>
-                                                <small class="field-hint">Internet havolasi, fayl yoki nusxalangan rasm (Ctrl+V) avtomatik saqlanadi</small>
+                                                <small class="field-hint">Google rasmda o'ng tugma → "Rasm URL nusxasi" → Ctrl+V. Avtomatik Firebase ga yuklanadi.</small>
                                             </div>
                                             <div class="form-field full">
                                                 <label for="productDescription">Tavsif</label>
@@ -2040,6 +2062,6 @@
 
     <script src="./config.js"></script>
     <script src="./admin-login.js?v=8"></script>
-    <script defer src="./script.js?v=17"></script>
+    <script defer src="./script.js?v=18"></script>
 </body>
 </html>
