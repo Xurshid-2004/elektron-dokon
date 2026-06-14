@@ -24,6 +24,8 @@ let firebaseStorage = null;
 let firebaseReady = false;
 let pendingProductImageFile = null;
 let pendingEditImageFile = null;
+let pendingProductImageDataUrl = null;
+let pendingEditImageDataUrl = null;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 let products = [];
 let orders = [];
@@ -739,6 +741,7 @@ function startEditProduct(productId) {
     elements.editFormError.textContent = "";
     elements.editTitle.textContent = `"${product.name}" ni tahrirlash`;
     pendingEditImageFile = null;
+    pendingEditImageDataUrl = null;
     if (product.imageUrl) {
         showImagePreview("edit", product.imageUrl);
     } else {
@@ -780,6 +783,7 @@ async function updateProduct(event) {
 
         editingProductId = null;
         pendingEditImageFile = null;
+        pendingEditImageDataUrl = null;
         clearImagePreview("edit");
         closeModal(elements.editModal);
         showToast("Mahsulot yangilandi", "success");
@@ -798,6 +802,7 @@ async function updateProduct(event) {
 function cancelEditProduct() {
     editingProductId = null;
     pendingEditImageFile = null;
+    pendingEditImageDataUrl = null;
     elements.editForm.reset();
     elements.editFormError.textContent = "";
     clearImagePreview("edit");
@@ -812,7 +817,62 @@ function resetProductForm() {
     elements.productStatus.value = "mavjud";
     elements.productFormError.textContent = "";
     pendingProductImageFile = null;
+    pendingProductImageDataUrl = null;
     clearImagePreview("product");
+}
+
+function normalizeImageSource(value) {
+    return String(value || "").replace(/\s+/g, "").trim();
+}
+
+function isDataImageUrl(value) {
+    return normalizeImageSource(value).startsWith("data:image/");
+}
+
+function setPendingImageDataUrl(mode, dataUrl) {
+    const normalized = normalizeImageSource(dataUrl);
+    if (mode === "edit") {
+        pendingEditImageDataUrl = normalized;
+        pendingEditImageFile = null;
+    } else {
+        pendingProductImageDataUrl = normalized;
+        pendingProductImageFile = null;
+    }
+}
+
+function getPendingImageDataUrl(mode) {
+    return mode === "edit" ? pendingEditImageDataUrl : pendingProductImageDataUrl;
+}
+
+function clearPendingImageDataUrl(mode) {
+    if (mode === "edit") {
+        pendingEditImageDataUrl = null;
+    } else {
+        pendingProductImageDataUrl = null;
+    }
+}
+
+function applyImageSourceToField(mode, source) {
+    const { input } = getImageFieldRefs(mode);
+    if (!input) return;
+
+    if (isDataImageUrl(source)) {
+        const normalized = normalizeImageSource(source);
+        setPendingImageDataUrl(mode, normalized);
+        input.value = normalized.length > 120
+            ? `${normalized.slice(0, 72)}...${normalized.slice(-28)}`
+            : normalized;
+        showImagePreview(mode, normalized);
+        return;
+    }
+
+    clearPendingImageDataUrl(mode);
+    input.value = source;
+    if (source) {
+        showImagePreview(mode, source);
+    } else {
+        clearImagePreview(mode);
+    }
 }
 
 function getImageFieldRefs(mode) {
@@ -866,15 +926,27 @@ function bindImageUploadControls(mode) {
             if (!selected) return;
             if (mode === "edit") {
                 pendingEditImageFile = selected;
+                pendingEditImageDataUrl = null;
             } else {
                 pendingProductImageFile = selected;
+                pendingProductImageDataUrl = null;
             }
-            input.value = "";
+            if (input) input.value = "";
             showImagePreview(mode, selected);
         });
     }
 
     input.addEventListener("paste", (event) => {
+        const text = event.clipboardData?.getData("text/plain") || "";
+        const normalizedText = normalizeImageSource(text);
+
+        if (isDataImageUrl(normalizedText)) {
+            event.preventDefault();
+            applyImageSourceToField(mode, normalizedText);
+            showToast("Rasm URL qabul qilindi — saqlashda yuklanadi", "success");
+            return;
+        }
+
         const items = event.clipboardData?.items;
         if (!items) return;
 
@@ -886,10 +958,12 @@ function bindImageUploadControls(mode) {
 
             if (mode === "edit") {
                 pendingEditImageFile = pastedFile;
+                pendingEditImageDataUrl = null;
             } else {
                 pendingProductImageFile = pastedFile;
+                pendingProductImageDataUrl = null;
             }
-            input.value = "";
+            if (input) input.value = "";
             showImagePreview(mode, pastedFile);
             showToast("Rasm qo'shildi — saqlashda yuklanadi", "success");
             break;
@@ -897,8 +971,10 @@ function bindImageUploadControls(mode) {
     });
 
     input.addEventListener("input", () => {
-        const value = input.value.trim();
-        if (value.startsWith("data:image/")) {
+        const value = normalizeImageSource(input.value);
+
+        if (isDataImageUrl(value)) {
+            setPendingImageDataUrl(mode, value);
             showImagePreview(mode, value);
             if (mode === "edit") {
                 pendingEditImageFile = null;
@@ -908,21 +984,29 @@ function bindImageUploadControls(mode) {
             return;
         }
 
-        if (/^https?:\/\//i.test(value)) {
-            showImagePreview(mode, value);
+        clearPendingImageDataUrl(mode);
+
+        if (/^https?:\/\//i.test(input.value.trim())) {
+            showImagePreview(mode, input.value.trim());
             return;
         }
 
-        if (!value) {
+        if (!input.value.trim()) {
             clearImagePreview(mode);
+            if (mode === "edit") {
+                pendingEditImageFile = null;
+            } else {
+                pendingProductImageFile = null;
+            }
         }
     });
 }
 
 function parseDataUrlImage(dataUrl) {
-    const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/);
+    const normalized = normalizeImageSource(dataUrl);
+    const match = normalized.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=]+)$/);
     if (!match) {
-        throw new Error("Nusxalangan rasm formati noto'g'ri");
+        throw new Error("Rasm URL noto'g'ri yoki to'liq emas. Google'dan qayta nusxalang");
     }
 
     const mime = match[1];
@@ -982,29 +1066,36 @@ async function uploadProductImage(source) {
 async function resolveImageForSave(mode) {
     const isEdit = mode === "edit";
     const pendingFile = isEdit ? pendingEditImageFile : pendingProductImageFile;
+    const pendingDataUrl = getPendingImageDataUrl(mode);
     const { input } = getImageFieldRefs(mode);
-    const raw = input?.value.trim() || "";
+    const raw = normalizeImageSource(input?.value || "");
+    const dataUrl = pendingDataUrl || (isDataImageUrl(raw) ? raw : "");
 
     if (pendingFile) {
         showToast("Rasm Firebase Storage ga yuklanmoqda...", "info");
-        return uploadProductImage(pendingFile);
+        const url = await uploadProductImage(pendingFile);
+        clearPendingImageDataUrl(mode);
+        return url;
     }
 
-    if (raw.startsWith("data:image/")) {
+    if (dataUrl) {
         showToast("Rasm Firebase Storage ga yuklanmoqda...", "info");
-        return uploadProductImage(raw);
+        const url = await uploadProductImage(dataUrl);
+        clearPendingImageDataUrl(mode);
+        return url;
     }
 
-    if (!raw) return "";
+    const visible = input?.value.trim() || "";
+    if (!visible) return "";
 
-    if (/^https?:\/\//i.test(raw)) {
-        if (raw.length > 2000) {
+    if (/^https?:\/\//i.test(visible)) {
+        if (visible.length > 2000) {
             throw new Error("Rasm URL juda uzun");
         }
-        return raw;
+        return visible;
     }
 
-    throw new Error("Rasm uchun URL kiriting, fayl tanlang yoki Ctrl+V bilan rasm qo'ying");
+    throw new Error("Rasm uchun https:// URL, Google rasm URL yoki fayl tanlang");
 }
 
 function readForm(mode) {
@@ -1021,9 +1112,12 @@ function readForm(mode) {
     const name = nameEl.value.trim();
     const priceRaw = priceEl.value.trim();
     const category = catEl.value;
-    const imageUrl = imageEl.value.trim();
+    const imageUrl = normalizeImageSource(imageEl.value);
     const description = descEl.value.trim();
     const status = statusEl.value;
+    const pendingFile = mode === "edit" ? pendingEditImageFile : pendingProductImageFile;
+    const pendingDataUrl = getPendingImageDataUrl(mode);
+    const hasImage = pendingFile || pendingDataUrl || isDataImageUrl(imageUrl) || /^https?:\/\//i.test(imageEl.value.trim());
 
     if (!name || !priceRaw || !category || !description) {
         errorEl.textContent = "Barcha majburiy maydonlarni to'ldiring";
@@ -1038,15 +1132,21 @@ function readForm(mode) {
         return null;
     }
 
-    const pendingFile = mode === "edit" ? pendingEditImageFile : pendingProductImageFile;
-    if (imageUrl && !imageUrl.startsWith("data:image/") && !/^https?:\/\//i.test(imageUrl) && !pendingFile) {
-        errorEl.textContent = "Rasm uchun to'g'ri URL, fayl yoki Ctrl+V rasm kiriting";
+    if (imageEl.value.trim() && !hasImage) {
+        errorEl.textContent = "Rasm URL noto'g'ri. Google'dan 'Rasm URL nusxasi' yoki https:// kiriting";
         showToast("Rasm formati noto'g'ri", "error");
         return null;
     }
 
     errorEl.textContent = "";
-    return { name, price, category, imageUrl, description, status };
+    return {
+        name,
+        price,
+        category,
+        imageUrl: pendingDataUrl || imageEl.value.trim(),
+        description,
+        status
+    };
 }
 
 function validatePrice(value) {
