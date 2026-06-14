@@ -172,6 +172,7 @@ function cacheElements() {
         detailCategory: document.getElementById("detailCategory"),
         detailPrice: document.getElementById("detailPrice"),
         detailStatus: document.getElementById("detailStatus"),
+        detailStatusText: document.getElementById("detailStatusText"),
         detailDescription: document.getElementById("detailDescription"),
         detailOrderBtn: document.getElementById("detailOrderBtn"),
         deleteModal: document.getElementById("deleteModal"),
@@ -220,7 +221,6 @@ function cacheElements() {
         categoryFilter: document.getElementById("categoryFilter"),
         confirmDeleteBtn: document.getElementById("confirmDeleteBtn"),
         deleteMessage: document.getElementById("deleteMessage"),
-        heroProductCount: document.getElementById("heroProductCount"),
         statTotalProducts: document.getElementById("statTotalProducts"),
         statAvailableProducts: document.getElementById("statAvailableProducts"),
         statSoldOutProducts: document.getElementById("statSoldOutProducts"),
@@ -489,11 +489,10 @@ function renderProducts() {
             <div class="product-body">
                 <span class="product-category">${escapeHtml(product.category || "Umumiy")}</span>
                 <h3>${escapeHtml(product.name)}</h3>
-                <p>${escapeHtml(product.description || "")}</p>
                 <div class="product-actions">
-                    <button class="btn outline" type="button" data-detail-id="${escapeHtml(product.id)}">Batafsil</button>
-                    <button class="btn" type="button" data-order-id="${escapeHtml(product.id)}" ${isAvailable ? "" : "disabled"}>
-                        ${isAvailable ? "Zakaz qilish" : "Tugagan"}
+                    <button class="btn btn-detail" type="button" data-detail-id="${escapeHtml(product.id)}">Batafsil</button>
+                    <button class="btn btn-order" type="button" data-order-id="${escapeHtml(product.id)}" ${isAvailable ? "" : "disabled"}>
+                        ${isAvailable ? "Zakaz" : "Tugagan"}
                     </button>
                 </div>
             </div>
@@ -696,10 +695,6 @@ function renderStats() {
     if (elements.statAvailableProducts) elements.statAvailableProducts.textContent = availableProducts;
     if (elements.statSoldOutProducts) elements.statSoldOutProducts.textContent = soldOutProducts;
     if (elements.statTotalOrders) elements.statTotalOrders.textContent = totalOrders;
-
-    if (elements.heroProductCount) {
-        elements.heroProductCount.textContent = `${totalProducts}`;
-    }
 }
 
 async function addProduct(event) {
@@ -1432,10 +1427,15 @@ function openProductDetailModal(productId) {
         elements.detailDescription.textContent = product.description || "Tavsif kiritilmagan.";
     }
 
+    const statusLabel = isAvailable ? "Mavjud" : "Tugagan";
+    if (elements.detailStatusText) elements.detailStatusText.textContent = statusLabel;
     if (elements.detailStatus) {
-        elements.detailStatus.textContent = isAvailable ? "Mavjud" : "Tugagan";
+        elements.detailStatus.textContent = statusLabel;
         elements.detailStatus.className = `status-pill ${isAvailable ? "available" : "sold-out"}`;
     }
+
+    const detailTitle = document.getElementById("detailTitle");
+    if (detailTitle) detailTitle.textContent = product.name || "Mahsulot haqida";
 
     if (elements.detailOrderBtn) {
         elements.detailOrderBtn.dataset.orderId = product.id;

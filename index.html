@@ -304,10 +304,6 @@
             background: linear-gradient(180deg, rgba(23, 21, 29, 0.10), rgba(23, 21, 29, 0.78));
         }
 
-        .hero-stat { position: relative; z-index: 1; display: grid; gap: 6px; }
-        .hero-stat strong { font-size: 42px; line-height: 1; }
-        .hero-stat span { color: rgba(255, 255, 255, 0.82); font-weight: 650; }
-
         /* ── Buttons ── */
         .btn {
             min-height: 46px;
@@ -482,9 +478,9 @@
 
         .products-grid {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 24px;
-            perspective: 1400px;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 16px;
+            align-items: stretch;
         }
 
         .product-card {
@@ -493,27 +489,22 @@
             display: flex;
             min-height: 100%;
             flex-direction: column;
-            background: var(--panel);
-            border: 1px solid rgba(23, 21, 29, 0.08);
-            border-radius: 16px;
-            box-shadow: 0 18px 44px rgba(23, 21, 29, 0.08);
+            background: #fff;
+            border: 1px solid rgba(23, 21, 29, 0.07);
+            border-radius: 14px;
+            box-shadow: 0 8px 24px rgba(23, 21, 29, 0.06);
             opacity: 0;
-            transform: translateY(40px) rotateX(-8deg);
-            transform-style: preserve-3d;
-            transform-origin: center bottom;
+            transform: translateY(18px);
             transition:
-                transform 520ms cubic-bezier(0.16, 1, 0.3, 1),
-                box-shadow 360ms ease,
-                opacity 520ms ease;
+                transform 420ms cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 280ms ease,
+                opacity 420ms ease;
             will-change: transform;
-            animation: cardFloat 6s ease-in-out infinite;
-            animation-play-state: paused;
         }
 
         .product-card.is-visible {
             opacity: 1;
-            transform: translateY(0) rotateX(0);
-            animation-play-state: running;
+            transform: translateY(0);
         }
 
         .product-card::before {
@@ -521,69 +512,47 @@
             position: absolute;
             inset: 0;
             border-radius: inherit;
-            padding: 1.5px;
-            background: linear-gradient(135deg, var(--emerald), var(--gold), var(--rose));
+            padding: 1px;
+            background: linear-gradient(135deg, var(--emerald), var(--gold));
             -webkit-mask:
                 linear-gradient(#000 0 0) content-box,
                 linear-gradient(#000 0 0);
             -webkit-mask-composite: xor;
                     mask-composite: exclude;
             opacity: 0;
-            transition: opacity 280ms ease;
+            transition: opacity 220ms ease;
             pointer-events: none;
             z-index: 3;
         }
 
         .product-card::after {
-            content: "";
-            position: absolute;
-            top: var(--shine-y, 50%);
-            left: var(--shine-x, 50%);
-            width: 320px;
-            height: 320px;
-            transform: translate(-50%, -50%);
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.55) 0%, transparent 60%);
-            opacity: 0;
-            transition: opacity 260ms ease;
-            pointer-events: none;
-            z-index: 2;
-            mix-blend-mode: overlay;
+            display: none;
         }
 
         .product-card:hover {
-            animation-play-state: paused;
-            box-shadow:
-                0 34px 80px rgba(18, 108, 91, 0.26),
-                0 0 0 1px rgba(199, 161, 90, 0.22);
+            box-shadow: 0 14px 36px rgba(18, 108, 91, 0.14);
+            transform: translateY(-4px);
+        }
+
+        .product-card.is-visible:hover {
+            transform: translateY(-4px);
         }
 
         .product-card:hover::before { opacity: 1; }
-        .product-card:hover::after { opacity: 1; }
 
         .product-card .product-media,
         .product-card .product-body {
             position: relative;
             z-index: 1;
-            transform: translateZ(0);
-        }
-
-        .product-card:hover .product-body > h3,
-        .product-card:hover .product-body > .product-category {
-            transform: translateZ(30px);
-        }
-
-        .product-card .product-body > h3,
-        .product-card .product-body > .product-category {
-            transition: transform 360ms cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         .product-card.sold-out {
-            opacity: 0.88;
+            opacity: 0.9;
         }
 
         .product-media {
             position: relative;
-            height: 260px;
+            height: 185px;
             overflow: hidden;
             background: linear-gradient(135deg, #1b1a22, #126c5b 54%, #c7a15a);
         }
@@ -604,48 +573,48 @@
             transition: transform 520ms ease;
         }
 
-        .product-card:hover .product-media img { transform: scale(1.08); }
+        .product-card:hover .product-media img { transform: scale(1.05); }
 
         .product-placeholder {
             height: 100%;
             display: grid;
             place-items: center;
-            padding: 24px;
+            padding: 16px;
             color: rgba(255, 255, 255, 0.92);
             text-align: center;
-            font-size: 22px;
-            font-weight: 900;
+            font-size: 15px;
+            font-weight: 800;
         }
 
         .price-pill {
             position: absolute;
-            right: 14px;
-            bottom: 14px;
+            right: 10px;
+            bottom: 10px;
             z-index: 2;
-            padding: 9px 14px;
+            padding: 6px 11px;
             color: #fff;
             background: linear-gradient(135deg, rgba(199, 161, 90, 0.92), rgba(139, 100, 39, 0.95));
             border: 1px solid rgba(255, 255, 255, 0.30);
             border-radius: 999px;
             backdrop-filter: blur(10px);
             font-weight: 900;
-            font-size: 14px;
-            box-shadow: 0 12px 24px rgba(139, 100, 39, 0.35);
+            font-size: 12px;
+            box-shadow: 0 8px 18px rgba(139, 100, 39, 0.28);
         }
 
         .status-pill {
             position: absolute;
-            left: 14px;
-            top: 14px;
-            padding: 6px 12px;
+            left: 10px;
+            top: 10px;
+            padding: 5px 9px;
             border-radius: 999px;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 900;
             text-transform: uppercase;
-            letter-spacing: 0.8px;
+            letter-spacing: 0.6px;
             backdrop-filter: blur(8px);
             border: 1px solid rgba(255, 255, 255, 0.30);
-            box-shadow: 0 8px 22px rgba(23, 21, 29, 0.18);
+            box-shadow: 0 6px 16px rgba(23, 21, 29, 0.16);
         }
 
         .status-pill.available {
@@ -662,47 +631,67 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            padding: 18px;
+            gap: 8px;
+            padding: 12px 14px 14px;
         }
 
-        .product-body h3 { font-size: 20px; line-height: 1.2; }
-
-        .product-category {
-            display: inline-block;
-            align-self: flex-start;
-            padding: 4px 10px;
-            color: var(--emerald);
-            background: rgba(18, 108, 91, 0.10);
-            border-radius: 999px;
-            font-size: 11px;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-        }
-
-        .product-body p {
-            min-height: 48px;
-            color: var(--muted);
-            font-size: 14px;
-            font-weight: 600;
+        .product-body h3 {
+            font-size: 16px;
+            line-height: 1.25;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
 
+        .product-category {
+            display: inline-block;
+            align-self: flex-start;
+            padding: 3px 8px;
+            color: var(--emerald);
+            background: rgba(18, 108, 91, 0.10);
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+        }
+
         .product-actions {
-            display: flex;
-            gap: 10px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
             margin-top: auto;
+            padding-top: 4px;
         }
 
         .product-actions .btn {
-            flex: 1;
-            min-height: 42px;
-            padding: 10px 12px;
-            font-size: 14px;
+            min-height: 36px;
+            padding: 8px 10px;
+            font-size: 12px;
+            font-weight: 800;
+            border-radius: 10px;
+        }
+
+        .product-actions .btn-detail {
+            color: var(--emerald);
+            background: rgba(18, 108, 91, 0.08);
+            border: 1.5px solid rgba(18, 108, 91, 0.32);
+            box-shadow: none;
+        }
+
+        .product-actions .btn-detail:hover {
+            background: rgba(18, 108, 91, 0.14);
+            transform: translateY(-1px);
+            box-shadow: none;
+        }
+
+        .product-actions .btn-order {
+            box-shadow: 0 8px 18px rgba(139, 100, 39, 0.22);
+        }
+
+        .product-actions .btn-order:disabled {
+            opacity: 0.55;
         }
 
         .empty-state {
@@ -823,8 +812,36 @@
         }
 
         .product-detail-info h2 {
-            font-size: 28px;
+            font-size: clamp(22px, 4vw, 28px);
             line-height: 1.15;
+        }
+
+        .product-detail-meta {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .detail-meta-item {
+            padding: 12px 14px;
+            background: #faf8f4;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+        }
+
+        .detail-meta-item span {
+            display: block;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 4px;
+        }
+
+        .detail-meta-item strong {
+            font-size: 15px;
+            line-height: 1.3;
         }
 
         .product-detail-price {
@@ -833,15 +850,46 @@
             color: var(--emerald);
         }
 
+        .product-detail-desc-title {
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+            color: #4d4856;
+        }
+
         .product-detail-desc {
             color: var(--muted);
             font-size: 15px;
             font-weight: 600;
             line-height: 1.65;
             white-space: pre-wrap;
+            padding: 14px;
+            background: #faf8f4;
+            border: 1px solid var(--line);
+            border-radius: 12px;
         }
 
-        .product-detail-order { margin-top: 8px; }
+        .product-detail-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 4px;
+        }
+
+        .product-detail-actions .btn { min-height: 44px; }
+
+        .product-detail-actions .btn-detail {
+            color: var(--emerald);
+            background: #fff;
+            border: 1.5px solid rgba(18, 108, 91, 0.35);
+            box-shadow: none;
+        }
+
+        @media (max-width: 560px) {
+            .product-detail-actions { grid-template-columns: 1fr; }
+            .product-detail-meta { grid-template-columns: 1fr; }
+        }
 
         @media (max-width: 720px) {
             .product-detail-layout { grid-template-columns: 1fr; }
@@ -1677,7 +1725,7 @@
             .hero-grid { grid-template-columns: 1fr; }
             .hero h1 { font-size: 44px; }
             .hero-panel { min-height: 260px; }
-            .products-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .products-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
         }
 
         @media (max-width: 860px) {
@@ -1718,10 +1766,16 @@
             .section-head { display: grid; align-items: start; gap: 14px; }
             .section-title { font-size: 30px; }
             .section-desc { font-size: 14px; }
-            .products-grid,
             .field-grid,
             .stats-grid { grid-template-columns: 1fr; }
-            .product-media { height: 230px; }
+            .products-grid {
+                grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+                gap: 12px;
+            }
+            .product-media { height: 155px; }
+            .product-body { padding: 10px 12px 12px; }
+            .product-body h3 { font-size: 14px; }
+            .product-actions .btn { font-size: 11px; min-height: 34px; padding: 7px 8px; }
             .modal-overlay { align-items: end; padding: 10px; }
             .modal { max-height: 92vh; }
             .modal-header, .modal-content { padding: 18px; }
@@ -1821,12 +1875,8 @@
                     </div>
                 </div>
 
-                <aside class="hero-panel" aria-label="Do'kon statistikasi">
+                <aside class="hero-panel" aria-label="Do'kon videosi">
                     <video class="hero-panel-video" src="./public/video.mp4" autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video>
-                    <div class="hero-stat">
-                        <strong id="heroProductCount">0</strong>
-                        <span>katalogimizda har kuni yangilanib turuvchi mahsulotlar</span>
-                    </div>
                 </aside>
             </div>
         </section>
@@ -1892,12 +1942,25 @@
                     <div class="product-detail-info">
                         <span class="product-category" id="detailCategory"></span>
                         <h2 id="detailName"></h2>
-                        <p class="product-detail-price" id="detailPrice"></p>
-                        <span class="status-pill" id="detailStatus"></span>
+                        <div class="product-detail-meta">
+                            <div class="detail-meta-item">
+                                <span>Narxi</span>
+                                <strong id="detailPrice"></strong>
+                            </div>
+                            <div class="detail-meta-item">
+                                <span>Holati</span>
+                                <strong id="detailStatusText"></strong>
+                            </div>
+                        </div>
+                        <span class="status-pill" id="detailStatus" hidden></span>
+                        <p class="product-detail-desc-title">Tavsif</p>
                         <p class="product-detail-desc" id="detailDescription"></p>
-                        <button class="btn full product-detail-order" type="button" id="detailOrderBtn" data-order-id="">
-                            Zakaz qilish
-                        </button>
+                        <div class="product-detail-actions">
+                            <button class="btn outline btn-detail full" type="button" data-close-modal>Yopish</button>
+                            <button class="btn full product-detail-order" type="button" id="detailOrderBtn" data-order-id="">
+                                Zakaz qilish
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2315,6 +2378,6 @@
 
     <script src="./config.js"></script>
     <script src="./admin-login.js?v=9"></script>
-    <script defer src="./script.js?v=23"></script>
+    <script defer src="./script.js?v=24"></script>
 </body>
 </html>
