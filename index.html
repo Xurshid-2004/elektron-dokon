@@ -28,7 +28,7 @@
         "description": "Yuqori sifatli zamonaviy kiyimlar online do'koni",
         "image": "./logo.png",
         "url": "https://sardorapp.vercel.app",
-        "telephone": "+998901234567",
+        "telephone": "+998887835588",
         "priceRange": "$$"
     }
     </script>
@@ -686,9 +686,24 @@
             color: var(--muted);
             font-size: 14px;
             font-weight: 600;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
 
-        .product-body .btn { margin-top: auto; }
+        .product-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: auto;
+        }
+
+        .product-actions .btn {
+            flex: 1;
+            min-height: 42px;
+            padding: 10px 12px;
+            font-size: 14px;
+        }
 
         .empty-state {
             grid-column: 1 / -1;
@@ -762,6 +777,76 @@
         .modal-header h2 { font-size: 24px; line-height: 1.15; }
         .modal-header p { margin-top: 6px; color: var(--muted); font-weight: 600; }
         .modal-content { padding: 22px; }
+
+        .product-detail-modal {
+            width: min(920px, 100%);
+            max-height: min(90vh, 860px);
+            overflow-y: auto;
+        }
+
+        .product-detail-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 24px;
+            align-items: start;
+        }
+
+        .product-detail-media {
+            border-radius: 14px;
+            overflow: hidden;
+            aspect-ratio: 4 / 5;
+            background: linear-gradient(135deg, #f0ede8, #e8e4dc);
+            border: 1px solid rgba(23, 21, 29, 0.08);
+        }
+
+        .product-detail-media img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .product-detail-placeholder {
+            width: 100%;
+            height: 100%;
+            display: grid;
+            place-items: center;
+            color: var(--muted);
+            font-weight: 800;
+            font-size: 15px;
+        }
+
+        .product-detail-info {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .product-detail-info h2 {
+            font-size: 28px;
+            line-height: 1.15;
+        }
+
+        .product-detail-price {
+            font-size: 24px;
+            font-weight: 900;
+            color: var(--emerald);
+        }
+
+        .product-detail-desc {
+            color: var(--muted);
+            font-size: 15px;
+            font-weight: 600;
+            line-height: 1.65;
+            white-space: pre-wrap;
+        }
+
+        .product-detail-order { margin-top: 8px; }
+
+        @media (max-width: 720px) {
+            .product-detail-layout { grid-template-columns: 1fr; }
+            .product-detail-media { aspect-ratio: 16 / 11; }
+        }
 
         .form-field {
             display: grid;
@@ -879,21 +964,67 @@
             display: grid;
             grid-template-columns: var(--sidebar-w) 1fr;
             height: 100vh;
-            max-height: 100vh;
+            height: 100dvh;
+            max-height: 100dvh;
             min-height: 0;
             overflow: hidden;
+            position: relative;
+        }
+
+        .admin-sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 65;
+            background: rgba(23, 21, 29, 0.48);
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+        }
+
+        .admin-sidebar-overlay.show { display: block; }
+
+        @media (min-width: 861px) {
+            .admin-sidebar-overlay { display: none !important; }
+            body.admin-sidebar-open { overflow: auto; }
         }
 
         .admin-sidebar {
             background: linear-gradient(180deg, var(--ink) 0%, #1f1c28 100%);
             color: #fff;
             padding: 24px 18px;
+            padding-bottom: max(24px, env(safe-area-inset-bottom));
             display: flex;
             flex-direction: column;
             gap: 28px;
             border-right: 1px solid rgba(255, 255, 255, 0.08);
             min-height: 0;
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .sidebar-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .sidebar-top .sidebar-brand {
+            flex: 1;
+            min-width: 0;
+            padding: 0;
+        }
+
+        .sidebar-close {
+            display: none;
+            width: 40px;
+            height: 40px;
+            flex-shrink: 0;
+            place-items: center;
+            color: #fff;
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: var(--radius);
         }
 
         .sidebar-brand {
@@ -1145,31 +1276,49 @@
             justify-content: space-between;
             gap: 16px;
             padding: 20px 28px;
+            padding-top: max(20px, env(safe-area-inset-top));
             background: rgba(255, 255, 255, 0.88);
             border-bottom: 1px solid var(--line);
             backdrop-filter: blur(14px);
+            flex-wrap: wrap;
+        }
+
+        .admin-header-start {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            min-width: 0;
+            flex: 1 1 240px;
+        }
+
+        .admin-header-copy {
+            min-width: 0;
         }
 
         .admin-header h1 {
-            font-size: 26px;
+            font-size: clamp(20px, 4vw, 26px);
             line-height: 1.1;
+            word-break: break-word;
         }
 
         .admin-header p {
             margin-top: 4px;
             color: var(--muted);
             font-weight: 650;
-            font-size: 14px;
+            font-size: 13px;
+            line-height: 1.45;
         }
 
         .admin-header-actions {
             display: flex;
             align-items: center;
             gap: 10px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
         }
 
         .admin-content {
-            padding: 24px 28px 32px;
+            padding: 24px 28px max(32px, env(safe-area-inset-bottom));
             overflow-x: hidden;
             overflow-y: auto;
             min-height: 0;
@@ -1276,6 +1425,14 @@
             overflow: auto;
             border: 1px solid var(--line);
             border-radius: var(--radius);
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+        }
+
+        .table-wrap::after {
+            content: "";
+            display: block;
+            height: 0;
         }
 
         .data-table {
@@ -1299,6 +1456,9 @@
             text-transform: uppercase;
             letter-spacing: 0.8px;
             color: #4d4856;
+            position: sticky;
+            top: 0;
+            z-index: 1;
         }
 
         .data-table tr:last-child td { border-bottom: 0; }
@@ -1438,12 +1598,15 @@
             display: none;
             width: 44px;
             height: 44px;
-            margin-bottom: 8px;
+            flex-shrink: 0;
             place-items: center;
             border: 1px solid var(--line);
             border-radius: var(--radius);
             background: #fff;
+            margin-top: 2px;
         }
+
+        body.admin-sidebar-open { overflow: hidden; }
 
         @keyframes riseIn {
             from { opacity: 0; transform: translateY(18px); }
@@ -1523,7 +1686,7 @@
             .admin-sidebar {
                 position: fixed;
                 inset: 0 auto 0 0;
-                width: min(var(--sidebar-w), 82vw);
+                width: min(var(--sidebar-w), 86vw);
                 z-index: 70;
                 transform: translateX(-105%);
                 transition: transform 240ms ease;
@@ -1532,10 +1695,13 @@
 
             .admin-sidebar.open { transform: translateX(0); }
 
-            .sidebar-toggle { display: inline-grid; }
+            .sidebar-toggle,
+            .sidebar-close { display: inline-grid; }
 
             .admin-header,
-            .admin-content { padding-left: 18px; padding-right: 18px; }
+            .admin-content { padding-left: 16px; padding-right: 16px; }
+
+            .admin-content { padding-top: 18px; }
         }
 
         @media (max-width: 720px) {
@@ -1561,6 +1727,50 @@
             .modal-header, .modal-content { padding: 18px; }
             .toolbar input { min-width: 100%; width: 100%; }
             .toolbar { width: 100%; }
+            .toolbar select { width: 100%; }
+            .panel-card-header { align-items: stretch; }
+            .panel-card-header h3 { font-size: 16px; }
+            .image-upload-row { grid-template-columns: 1fr; }
+            .image-upload-row .btn { width: 100%; }
+            .form-actions .btn { flex: 1 1 100%; }
+            .stat-card strong { font-size: 28px; }
+            .data-table { min-width: 580px; }
+            .data-table th,
+            .data-table td { padding: 11px 12px; font-size: 13px; }
+            .table-product { gap: 10px; }
+            .table-thumb { width: 42px; height: 42px; }
+            .toast-container {
+                left: 12px;
+                right: 12px;
+                bottom: max(12px, env(safe-area-inset-bottom));
+                width: auto;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .admin-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+                padding: 14px 14px;
+            }
+
+            .admin-header-start { align-items: center; }
+            .admin-header-actions { width: 100%; }
+            .admin-header-actions .badge { width: 100%; justify-content: center; }
+            .admin-content { padding: 14px 12px max(20px, env(safe-area-inset-bottom)); }
+            .panel-card-body { padding: 14px; }
+            .panel-card-header { padding: 14px; }
+            .stats-grid { gap: 12px; margin-bottom: 16px; }
+            .stat-card { padding: 16px; }
+            .stat-card strong { font-size: 24px; }
+            .products-layout { gap: 14px; }
+            .data-table { min-width: 520px; }
+            .icon-btn { width: 36px; height: 36px; }
+            .table-wrap {
+                margin-inline: -2px;
+                border-radius: 10px;
+            }
         }
     </style>
 </head>
@@ -1658,6 +1868,38 @@
                     <button class="btn full" type="submit">Kirish</button>
                     <p class="form-error" id="loginError" role="alert"></p>
                 </form>
+            </div>
+        </section>
+    </div>
+
+    <!-- Product detail modal -->
+    <div class="modal-overlay" id="productDetailModal" aria-hidden="true">
+        <section class="modal product-detail-modal" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+            <header class="modal-header">
+                <div>
+                    <h2 id="detailTitle">Mahsulot haqida</h2>
+                    <p>To'liq ma'lumot va zakaz berish</p>
+                </div>
+                <button class="modal-close" type="button" data-close-modal aria-label="Yopish">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </header>
+            <div class="modal-content">
+                <div class="product-detail-layout">
+                    <div class="product-detail-media" id="detailImage"></div>
+                    <div class="product-detail-info">
+                        <span class="product-category" id="detailCategory"></span>
+                        <h2 id="detailName"></h2>
+                        <p class="product-detail-price" id="detailPrice"></p>
+                        <span class="status-pill" id="detailStatus"></span>
+                        <p class="product-detail-desc" id="detailDescription"></p>
+                        <button class="btn full product-detail-order" type="button" id="detailOrderBtn" data-order-id="">
+                            Zakaz qilish
+                        </button>
+                    </div>
+                </div>
             </div>
         </section>
     </div>
@@ -1804,7 +2046,7 @@
                                 <button class="btn sm secondary" type="button" id="editImagePickBtn">Rasm tanlash</button>
                             </div>
                             <img id="editImagePreview" class="image-preview" alt="Rasm ko'rinishi" hidden>
-                            <small class="field-hint">Google rasmda o'ng tugma → "Rasm URL nusxasi" → Ctrl+V. Avtomatik Firebase ga yuklanadi.</small>
+                            <small class="field-hint">Google "Rasm URL nusxasi" (base64) yoki https:// havola. Ctrl+V bilan qo'shing — kartada chiqadi.</small>
                         </div>
                         <div class="form-field full">
                             <label for="editDescription">Tavsif</label>
@@ -1825,14 +2067,21 @@
     <div class="admin-dashboard" id="adminDashboard" aria-hidden="true">
         <div class="admin-shell">
             <aside class="admin-sidebar" id="adminSidebar">
-                <div class="sidebar-brand">
-                    <span class="sidebar-brand-mark" aria-hidden="true">
-                        <img src="./logo.png" alt="Dj_shop logo">
-                    </span>
-                    <div>
-                        <strong>Admin panel</strong>
-                        <span>Sifatli kiyimlar</span>
+                <div class="sidebar-top">
+                    <div class="sidebar-brand">
+                        <span class="sidebar-brand-mark" aria-hidden="true">
+                            <img src="./logo.png" alt="Dj_shop logo">
+                        </span>
+                        <div>
+                            <strong>Admin panel</strong>
+                            <span>Sifatli kiyimlar</span>
+                        </div>
                     </div>
+                    <button class="sidebar-close" type="button" id="sidebarCloseBtn" aria-label="Menyuni yopish">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
                 </div>
 
                 <nav class="sidebar-nav" aria-label="Admin bo'limlari">
@@ -1869,14 +2118,18 @@
                 </div>
             </aside>
 
+            <div class="admin-sidebar-overlay" id="adminSidebarOverlay" aria-hidden="true"></div>
+
             <div class="admin-main">
                 <header class="admin-header">
-                    <div>
+                    <div class="admin-header-start">
                         <button class="sidebar-toggle" type="button" id="sidebarToggleBtn" aria-label="Menyuni ochish">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                         </button>
-                        <h1 id="adminPageTitle">Mahsulotlar</h1>
-                        <p id="adminPageDesc">Mahsulotlarni qo'shing, tahrirlang va boshqaring</p>
+                        <div class="admin-header-copy">
+                            <h1 id="adminPageTitle">Mahsulotlar</h1>
+                            <p id="adminPageDesc">Mahsulotlarni qo'shing, tahrirlang va boshqaring</p>
+                        </div>
                     </div>
                     <div class="admin-header-actions">
                         <span class="badge warning" id="firebaseStatusBadge" title="Firebase ulanish holati">Firebase ulanmoqda...</span>
@@ -1958,7 +2211,7 @@
                                                     <button class="btn sm secondary" type="button" id="productImagePickBtn">Rasm tanlash</button>
                                                 </div>
                                                 <img id="productImagePreview" class="image-preview" alt="Rasm ko'rinishi" hidden>
-                                                <small class="field-hint">Google rasmda o'ng tugma → "Rasm URL nusxasi" → Ctrl+V. Avtomatik Firebase ga yuklanadi.</small>
+                                                <small class="field-hint">Google "Rasm URL nusxasi" (base64) yoki https:// havola. Ctrl+V bilan qo'shing — kartada chiqadi.</small>
                                             </div>
                                             <div class="form-field full">
                                                 <label for="productDescription">Tavsif</label>
@@ -2048,7 +2301,7 @@
             </div>
             <div class="footer-contact">
                 <p><strong>Aloqa</strong></p>
-                <p><a href="tel:+998901234567">+998 90 123 45 67</a></p>
+                <p><a href="tel:+998887835588">+998 88 783 55 88</a></p>
                 <p><a href="mailto:info@sifatlikiyimlar.uz">info@sifatlikiyimlar.uz</a></p>
             </div>
         </div>
@@ -2061,7 +2314,7 @@
     </noscript>
 
     <script src="./config.js"></script>
-    <script src="./admin-login.js?v=8"></script>
-    <script defer src="./script.js?v=18"></script>
+    <script src="./admin-login.js?v=9"></script>
+    <script defer src="./script.js?v=23"></script>
 </body>
 </html>

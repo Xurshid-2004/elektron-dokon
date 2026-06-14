@@ -79,6 +79,9 @@
 
         var sidebar = document.getElementById("adminSidebar");
         if (sidebar) sidebar.classList.remove("open");
+        if (typeof window.closeAdminSidebar === "function") {
+            window.closeAdminSidebar();
+        }
     }
 
     function showSimpleToast(message, type) {
@@ -258,6 +261,9 @@
         if (dash) {
             dash.classList.remove("show");
             dash.setAttribute("aria-hidden", "true");
+        }
+        if (typeof window.closeAdminSidebar === "function") {
+            window.closeAdminSidebar();
         }
         clearSession();
         var anyModal = document.querySelector(".modal-overlay.show");

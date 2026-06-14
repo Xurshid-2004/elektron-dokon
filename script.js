@@ -19,14 +19,13 @@ let adminPassword = localStorage.getItem(ADMIN_PWD_KEY) || DEFAULT_ADMIN_PASSWOR
 let fb = null;
 let db = null;
 let firebaseApp = null;
-let storageApi = null;
-let firebaseStorage = null;
 let firebaseReady = false;
 let pendingProductImageFile = null;
 let pendingEditImageFile = null;
 let pendingProductImageDataUrl = null;
 let pendingEditImageDataUrl = null;
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 680 * 1024;
+const MAX_IMAGE_DATA_URL_CHARS = 890000;
 let products = [];
 let orders = [];
 let selectedProductId = null;
@@ -167,10 +166,19 @@ function cacheElements() {
         ordersTable: document.getElementById("ordersTable"),
         loginModal: document.getElementById("loginModal"),
         orderModal: document.getElementById("orderModal"),
+        productDetailModal: document.getElementById("productDetailModal"),
+        detailImage: document.getElementById("detailImage"),
+        detailName: document.getElementById("detailName"),
+        detailCategory: document.getElementById("detailCategory"),
+        detailPrice: document.getElementById("detailPrice"),
+        detailStatus: document.getElementById("detailStatus"),
+        detailDescription: document.getElementById("detailDescription"),
+        detailOrderBtn: document.getElementById("detailOrderBtn"),
         deleteModal: document.getElementById("deleteModal"),
         editModal: document.getElementById("editModal"),
         adminDashboard: document.getElementById("adminDashboard"),
         adminSidebar: document.getElementById("adminSidebar"),
+        adminSidebarOverlay: document.getElementById("adminSidebarOverlay"),
         loginForm: document.getElementById("loginForm"),
         productForm: document.getElementById("productForm"),
         editForm: document.getElementById("editForm"),
@@ -232,14 +240,11 @@ async function initFirebase() {
     try {
         const appModule = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
         const fsModule = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-        const stModule = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js");
 
         fb = fsModule;
-        storageApi = stModule;
         const existingApps = appModule.getApps();
         firebaseApp = existingApps.length ? existingApps[0] : appModule.initializeApp(firebaseConfig);
         db = fsModule.getFirestore(firebaseApp);
-        firebaseStorage = stModule.getStorage(firebaseApp);
         firebaseReady = true;
 
         updateFirebaseStatus("connected");
@@ -297,7 +302,15 @@ function bindEvents() {
         }
         cancelEditProduct();
     });
-    bindById("sidebarToggleBtn", "click", toggleSidebar);
+    bindById("sidebarToggleBtn", "click", () => toggleSidebar());
+    bindById("sidebarCloseBtn", "click", () => closeAdminSidebar());
+    elements.adminSidebarOverlay?.addEventListener("click", closeAdminSidebar);
+
+    window.addEventListener("resize", () => {
+        if (window.innerWidth > 860) {
+            closeAdminSidebar();
+        }
+    });
     bindById("cancelEditBtn", "click", cancelEditProduct);
 
     bindEl(elements.orderForm, "submit", submitOrder, "orderForm");
@@ -341,18 +354,32 @@ function bindEvents() {
 
     document.addEventListener("keydown", (event) => {
         if (event.key === "Escape") {
+            if (elements.adminSidebar?.classList.contains("open")) {
+                closeAdminSidebar();
+                return;
+            }
             if (elements.editModal?.classList.contains("show")) {
                 cancelEditProduct();
             } else {
                 closeAllModals();
                 elements.adminSidebar.classList.remove("open");
+                syncAdminSidebarState(false);
             }
         }
     });
 
     document.addEventListener("click", (event) => {
+        const detailButton = event.target.closest("[data-detail-id]");
+        if (detailButton) {
+            openProductDetailModal(detailButton.dataset.detailId);
+            return;
+        }
+
         const orderButton = event.target.closest("[data-order-id]");
         if (orderButton && !orderButton.disabled) {
+            if (elements.productDetailModal?.classList.contains("show")) {
+                closeModal(elements.productDetailModal);
+            }
             openOrderModal(orderButton.dataset.orderId);
             return;
         }
@@ -450,7 +477,7 @@ function renderProducts() {
         card.style.animationDelay = `${(index % 3) * 0.8}s`;
 
         const media = product.imageUrl
-            ? `<img src="${escapeHtml(product.imageUrl)}" alt="${escapeHtml(product.name)}" loading="lazy" onerror="this.style.display='none'">`
+            ? buildProductImageHtml(product.imageUrl, product.name)
             : `<div class="product-placeholder">Sifatli kiyimlar</div>`;
 
         card.innerHTML = `
@@ -463,9 +490,12 @@ function renderProducts() {
                 <span class="product-category">${escapeHtml(product.category || "Umumiy")}</span>
                 <h3>${escapeHtml(product.name)}</h3>
                 <p>${escapeHtml(product.description || "")}</p>
-                <button class="btn full" type="button" data-order-id="${escapeHtml(product.id)}" ${isAvailable ? "" : "disabled"}>
-                    ${isAvailable ? "Zakaz qilish" : "Tugagan"}
-                </button>
+                <div class="product-actions">
+                    <button class="btn outline" type="button" data-detail-id="${escapeHtml(product.id)}">Batafsil</button>
+                    <button class="btn" type="button" data-order-id="${escapeHtml(product.id)}" ${isAvailable ? "" : "disabled"}>
+                        ${isAvailable ? "Zakaz qilish" : "Tugagan"}
+                    </button>
+                </div>
             </div>
         `;
 
@@ -736,13 +766,21 @@ function startEditProduct(productId) {
     elements.editPrice.value = String(product.price ?? "");
     elements.editCategory.value = product.category || "Erkaklar";
     elements.editStatus.value = product.status || "mavjud";
-    elements.editImage.value = product.imageUrl || "";
     elements.editDescription.value = product.description || "";
     elements.editFormError.textContent = "";
     elements.editTitle.textContent = `"${product.name}" ni tahrirlash`;
     pendingEditImageFile = null;
     pendingEditImageDataUrl = null;
+    clearImageFieldMeta("edit");
+
     if (product.imageUrl) {
+        if (isDataImageUrl(product.imageUrl)) {
+            setPendingImageDataUrl("edit", product.imageUrl);
+            markImageFieldBase64("edit");
+            elements.editImage.value = "";
+        } else {
+            elements.editImage.value = product.imageUrl;
+        }
         showImagePreview("edit", product.imageUrl);
     } else {
         clearImagePreview("edit");
@@ -803,6 +841,7 @@ function cancelEditProduct() {
     editingProductId = null;
     pendingEditImageFile = null;
     pendingEditImageDataUrl = null;
+    clearImageFieldMeta("edit");
     elements.editForm.reset();
     elements.editFormError.textContent = "";
     clearImagePreview("edit");
@@ -818,6 +857,7 @@ function resetProductForm() {
     elements.productFormError.textContent = "";
     pendingProductImageFile = null;
     pendingProductImageDataUrl = null;
+    clearImageFieldMeta("product");
     clearImagePreview("product");
 }
 
@@ -825,8 +865,93 @@ function normalizeImageSource(value) {
     return String(value || "").replace(/\s+/g, "").trim();
 }
 
+function isHttpImageUrl(value) {
+    return /^https?:\/\//i.test(String(value || "").trim());
+}
+
+function normalizeHttpImageUrl(value) {
+    const trimmed = String(value || "").trim();
+    if (!trimmed) return "";
+    const compact = trimmed.replace(/\s+/g, "");
+    if (/^https?:\/\//i.test(compact)) return compact;
+    if (/^\/\//.test(compact)) return `https:${compact}`;
+    return compact;
+}
+
+function buildProductImageHtml(imageUrl, name) {
+    const isHttp = isHttpImageUrl(imageUrl);
+    const referrer = isHttp ? ' referrerpolicy="no-referrer"' : '';
+    const fallback = '<div class="product-placeholder" hidden>Rasm yuklanmadi</div>';
+    return `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" loading="lazy" decoding="async"${referrer} onerror="this.onerror=null;this.hidden=true;this.nextElementSibling?.removeAttribute('hidden')">${fallback}`;
+}
+
+function buildDetailImageHtml(imageUrl, name) {
+    const isHttp = isHttpImageUrl(imageUrl);
+    const referrer = isHttp ? ' referrerpolicy="no-referrer"' : '';
+    return `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" decoding="async"${referrer} onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\\'product-detail-placeholder\\'>Rasm yuklanmadi</div>'">`;
+}
+
 function isDataImageUrl(value) {
     return normalizeImageSource(value).startsWith("data:image/");
+}
+
+function isTruncatedDataUrlDisplay(value) {
+    const text = String(value || "");
+    return text.startsWith("data:image/") && text.includes("...");
+}
+
+function clearImageFieldMeta(mode) {
+    const { input } = getImageFieldRefs(mode);
+    if (!input) return;
+    delete input.dataset.imageMode;
+}
+
+function markImageFieldBase64(mode) {
+    const { input } = getImageFieldRefs(mode);
+    if (!input) return;
+    input.dataset.imageMode = "base64";
+    input.value = "";
+}
+
+function getImageSourceFromField(mode) {
+    const isEdit = mode === "edit";
+    const pendingFile = isEdit ? pendingEditImageFile : pendingProductImageFile;
+    const pendingDataUrl = getPendingImageDataUrl(mode);
+    const { input } = getImageFieldRefs(mode);
+    const raw = normalizeImageSource(input?.value || "");
+
+    if (pendingFile) {
+        return { kind: "file", file: pendingFile };
+    }
+
+    if (pendingDataUrl && isDataImageUrl(pendingDataUrl)) {
+        return { kind: "data", url: pendingDataUrl };
+    }
+
+    if (isDataImageUrl(raw)) {
+        setPendingImageDataUrl(mode, raw);
+        markImageFieldBase64(mode);
+        return { kind: "data", url: raw };
+    }
+
+    if (isTruncatedDataUrlDisplay(input?.value || "") && pendingDataUrl) {
+        return { kind: "data", url: pendingDataUrl };
+    }
+
+    const httpUrl = normalizeHttpImageUrl(input?.value || "");
+    if (isHttpImageUrl(httpUrl)) {
+        return { kind: "http", url: httpUrl };
+    }
+
+    if (!input?.value?.trim() && input?.dataset.imageMode === "base64" && pendingDataUrl) {
+        return { kind: "data", url: pendingDataUrl };
+    }
+
+    if (!input?.value?.trim() && !pendingDataUrl && !pendingFile) {
+        return { kind: "empty" };
+    }
+
+    return { kind: "invalid" };
 }
 
 function setPendingImageDataUrl(mode, dataUrl) {
@@ -859,14 +984,13 @@ function applyImageSourceToField(mode, source) {
     if (isDataImageUrl(source)) {
         const normalized = normalizeImageSource(source);
         setPendingImageDataUrl(mode, normalized);
-        input.value = normalized.length > 120
-            ? `${normalized.slice(0, 72)}...${normalized.slice(-28)}`
-            : normalized;
+        markImageFieldBase64(mode);
         showImagePreview(mode, normalized);
         return;
     }
 
     clearPendingImageDataUrl(mode);
+    clearImageFieldMeta(mode);
     input.value = source;
     if (source) {
         showImagePreview(mode, source);
@@ -932,6 +1056,7 @@ function bindImageUploadControls(mode) {
                 pendingProductImageDataUrl = null;
             }
             if (input) input.value = "";
+            clearImageFieldMeta(mode);
             showImagePreview(mode, selected);
         });
     }
@@ -943,7 +1068,7 @@ function bindImageUploadControls(mode) {
         if (isDataImageUrl(normalizedText)) {
             event.preventDefault();
             applyImageSourceToField(mode, normalizedText);
-            showToast("Rasm URL qabul qilindi — saqlashda yuklanadi", "success");
+            showToast("Rasm qo'shildi — base64 sifatida saqlanadi", "success");
             return;
         }
 
@@ -964,17 +1089,20 @@ function bindImageUploadControls(mode) {
                 pendingProductImageDataUrl = null;
             }
             if (input) input.value = "";
+            clearImageFieldMeta(mode);
             showImagePreview(mode, pastedFile);
-            showToast("Rasm qo'shildi — saqlashda yuklanadi", "success");
+            showToast("Rasm qo'shildi — base64 sifatida saqlanadi", "success");
             break;
         }
     });
 
     input.addEventListener("input", () => {
         const value = normalizeImageSource(input.value);
+        const pending = getPendingImageDataUrl(mode);
 
         if (isDataImageUrl(value)) {
             setPendingImageDataUrl(mode, value);
+            markImageFieldBase64(mode);
             showImagePreview(mode, value);
             if (mode === "edit") {
                 pendingEditImageFile = null;
@@ -984,10 +1112,22 @@ function bindImageUploadControls(mode) {
             return;
         }
 
-        clearPendingImageDataUrl(mode);
+        if (isTruncatedDataUrlDisplay(input.value) && pending) {
+            showImagePreview(mode, pending);
+            return;
+        }
 
-        if (/^https?:\/\//i.test(input.value.trim())) {
-            showImagePreview(mode, input.value.trim());
+        if (input.dataset.imageMode === "base64" && pending) {
+            showImagePreview(mode, pending);
+            return;
+        }
+
+        clearPendingImageDataUrl(mode);
+        clearImageFieldMeta(mode);
+
+        const httpUrl = normalizeHttpImageUrl(input.value);
+        if (isHttpImageUrl(httpUrl)) {
+            showImagePreview(mode, httpUrl);
             return;
         }
 
@@ -1004,6 +1144,10 @@ function bindImageUploadControls(mode) {
 
 function parseDataUrlImage(dataUrl) {
     const normalized = normalizeImageSource(dataUrl);
+    if (normalized.length > MAX_IMAGE_DATA_URL_CHARS) {
+        throw new Error("Rasm juda katta. Kichikroq rasm tanlang yoki https:// URL ishlating");
+    }
+
     const match = normalized.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=]+)$/);
     if (!match) {
         throw new Error("Rasm URL noto'g'ri yoki to'liq emas. Google'dan qayta nusxalang");
@@ -1018,84 +1162,66 @@ function parseDataUrlImage(dataUrl) {
 
     const blob = new Blob([bytes], { type: mime });
     if (blob.size > MAX_IMAGE_BYTES) {
-        throw new Error("Rasm 5MB dan katta");
+        throw new Error("Rasm juda katta (max ~400KB). Kichikroq rasm tanlang");
     }
 
     const ext = mime.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
-    return { blob, ext, mime };
+    return { blob, ext, mime, dataUrl: normalized };
 }
 
-async function uploadProductImage(source) {
-    if (!storageApi || !firebaseStorage) {
-        throw new Error("Firebase Storage ulanmagan");
-    }
-
-    let blob;
-    let ext = "jpg";
-    let contentType = "image/jpeg";
-
-    if (source instanceof File || source instanceof Blob) {
-        if (!source.type?.startsWith("image/")) {
-            throw new Error("Faqat rasm fayli yuklanadi");
+function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        if (!file?.type?.startsWith("image/")) {
+            reject(new Error("Faqat rasm fayli qabul qilinadi"));
+            return;
         }
-        if (source.size > MAX_IMAGE_BYTES) {
-            throw new Error("Rasm 5MB dan katta");
+        if (file.size > MAX_IMAGE_BYTES) {
+            reject(new Error("Rasm juda katta (max ~400KB). Kichikroq rasm tanlang"));
+            return;
         }
-        blob = source;
-        contentType = source.type || contentType;
-        if (source instanceof File && source.name.includes(".")) {
-            ext = source.name.split(".").pop().toLowerCase();
-        } else {
-            ext = contentType.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
-        }
-    } else if (typeof source === "string" && source.startsWith("data:image/")) {
-        const parsed = parseDataUrlImage(source);
-        blob = parsed.blob;
-        ext = parsed.ext;
-        contentType = parsed.mime;
-    } else {
-        throw new Error("Rasm manbasi noto'g'ri");
-    }
 
-    const path = `products/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
-    const imageRef = storageApi.ref(firebaseStorage, path);
-    await storageApi.uploadBytes(imageRef, blob, { contentType });
-    return storageApi.getDownloadURL(imageRef);
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                const dataUrl = normalizeImageSource(String(reader.result || ""));
+                parseDataUrlImage(dataUrl);
+                resolve(dataUrl);
+            } catch (error) {
+                reject(error);
+            }
+        };
+        reader.onerror = () => reject(new Error("Rasm o'qilmadi"));
+        reader.readAsDataURL(file);
+    });
 }
 
 async function resolveImageForSave(mode) {
-    const isEdit = mode === "edit";
-    const pendingFile = isEdit ? pendingEditImageFile : pendingProductImageFile;
-    const pendingDataUrl = getPendingImageDataUrl(mode);
-    const { input } = getImageFieldRefs(mode);
-    const raw = normalizeImageSource(input?.value || "");
-    const dataUrl = pendingDataUrl || (isDataImageUrl(raw) ? raw : "");
+    const source = getImageSourceFromField(mode);
 
-    if (pendingFile) {
-        showToast("Rasm Firebase Storage ga yuklanmoqda...", "info");
-        const url = await uploadProductImage(pendingFile);
+    if (source.kind === "file") {
+        const base64 = await fileToDataUrl(source.file);
         clearPendingImageDataUrl(mode);
-        return url;
+        return base64;
     }
 
-    if (dataUrl) {
-        showToast("Rasm Firebase Storage ga yuklanmoqda...", "info");
-        const url = await uploadProductImage(dataUrl);
+    if (source.kind === "data") {
+        parseDataUrlImage(source.url);
         clearPendingImageDataUrl(mode);
-        return url;
+        return source.url;
     }
 
-    const visible = input?.value.trim() || "";
-    if (!visible) return "";
-
-    if (/^https?:\/\//i.test(visible)) {
-        if (visible.length > 2000) {
+    if (source.kind === "http") {
+        if (source.url.length > 2000) {
             throw new Error("Rasm URL juda uzun");
         }
-        return visible;
+        return source.url;
     }
 
-    throw new Error("Rasm uchun https:// URL, Google rasm URL yoki fayl tanlang");
+    if (source.kind === "empty") {
+        return "";
+    }
+
+    throw new Error("Rasm noto'g'ri. Google'dan 'Rasm URL nusxasi' yoki https:// havola kiriting");
 }
 
 function readForm(mode) {
@@ -1108,16 +1234,14 @@ function readForm(mode) {
     const statusEl = mode === "edit" ? elements.editStatus : elements.productStatus;
     const imageEl = mode === "edit" ? elements.editImage : elements.productImage;
     const descEl = mode === "edit" ? elements.editDescription : elements.productDescription;
+    const imageSource = getImageSourceFromField(mode);
 
     const name = nameEl.value.trim();
     const priceRaw = priceEl.value.trim();
     const category = catEl.value;
-    const imageUrl = normalizeImageSource(imageEl.value);
     const description = descEl.value.trim();
     const status = statusEl.value;
-    const pendingFile = mode === "edit" ? pendingEditImageFile : pendingProductImageFile;
-    const pendingDataUrl = getPendingImageDataUrl(mode);
-    const hasImage = pendingFile || pendingDataUrl || isDataImageUrl(imageUrl) || /^https?:\/\//i.test(imageEl.value.trim());
+    const hasImage = imageSource.kind !== "empty" && imageSource.kind !== "invalid";
 
     if (!name || !priceRaw || !category || !description) {
         errorEl.textContent = "Barcha majburiy maydonlarni to'ldiring";
@@ -1132,8 +1256,8 @@ function readForm(mode) {
         return null;
     }
 
-    if (imageEl.value.trim() && !hasImage) {
-        errorEl.textContent = "Rasm URL noto'g'ri. Google'dan 'Rasm URL nusxasi' yoki https:// kiriting";
+    if ((imageEl.value.trim() || imageEl.dataset.imageMode === "base64") && !hasImage) {
+        errorEl.textContent = "Rasm noto'g'ri. Google'dan 'Rasm URL nusxasi', https:// yoki fayl tanlang";
         showToast("Rasm formati noto'g'ri", "error");
         return null;
     }
@@ -1143,7 +1267,11 @@ function readForm(mode) {
         name,
         price,
         category,
-        imageUrl: pendingDataUrl || imageEl.value.trim(),
+        imageUrl: imageSource.kind === "data"
+            ? imageSource.url
+            : imageSource.kind === "http"
+                ? imageSource.url
+                : "",
         description,
         status
     };
@@ -1254,12 +1382,68 @@ function switchAdminSection(sectionName) {
     }
 
     elements.adminSidebar?.classList.remove("open");
+    syncAdminSidebarState(false);
 }
 
 window.switchAdminSection = switchAdminSection;
 
-function toggleSidebar() {
-    elements.adminSidebar.classList.toggle("open");
+function syncAdminSidebarState(open) {
+    elements.adminSidebarOverlay?.classList.toggle("show", open);
+    elements.adminSidebarOverlay?.setAttribute("aria-hidden", open ? "false" : "true");
+    document.body.classList.toggle("admin-sidebar-open", open);
+}
+
+function closeAdminSidebar() {
+    elements.adminSidebar?.classList.remove("open");
+    syncAdminSidebarState(false);
+}
+
+function toggleSidebar(forceOpen) {
+    if (!elements.adminSidebar) return;
+    const open = typeof forceOpen === "boolean"
+        ? forceOpen
+        : !elements.adminSidebar.classList.contains("open");
+    elements.adminSidebar.classList.toggle("open", open);
+    syncAdminSidebarState(open);
+}
+
+window.closeAdminSidebar = closeAdminSidebar;
+
+function openProductDetailModal(productId) {
+    const product = products.find((item) => item.id === productId);
+
+    if (!product) {
+        showToast("Mahsulot topilmadi", "error");
+        return;
+    }
+
+    const isAvailable = product.status === "mavjud";
+
+    if (elements.detailImage) {
+        elements.detailImage.innerHTML = product.imageUrl
+            ? buildDetailImageHtml(product.imageUrl, product.name)
+            : '<div class="product-detail-placeholder">Rasm yo\'q</div>';
+    }
+
+    if (elements.detailName) elements.detailName.textContent = product.name || "Nomsiz";
+    if (elements.detailCategory) elements.detailCategory.textContent = product.category || "Umumiy";
+    if (elements.detailPrice) elements.detailPrice.textContent = formatPrice(product.price);
+    if (elements.detailDescription) {
+        elements.detailDescription.textContent = product.description || "Tavsif kiritilmagan.";
+    }
+
+    if (elements.detailStatus) {
+        elements.detailStatus.textContent = isAvailable ? "Mavjud" : "Tugagan";
+        elements.detailStatus.className = `status-pill ${isAvailable ? "available" : "sold-out"}`;
+    }
+
+    if (elements.detailOrderBtn) {
+        elements.detailOrderBtn.dataset.orderId = product.id;
+        elements.detailOrderBtn.disabled = !isAvailable;
+        elements.detailOrderBtn.textContent = isAvailable ? "Zakaz qilish" : "Tugagan";
+    }
+
+    openModal(elements.productDetailModal);
 }
 
 function openOrderModal(productId) {

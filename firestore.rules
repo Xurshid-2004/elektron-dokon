@@ -18,7 +18,7 @@ service cloud.firestore {
         && data.description.size() > 0
         && data.description.size() <= 500
         && data.status in ['mavjud', 'tugagan']
-        && (!('imageUrl' in data) || data.imageUrl is string);
+        && (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 900000));
     }
 
     function isValidOrder() {
