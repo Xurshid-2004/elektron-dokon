@@ -768,24 +768,52 @@
         .modal-content { padding: 22px; }
 
         .product-detail-modal {
-            width: min(920px, 100%);
-            max-height: min(90vh, 860px);
+            width: min(520px, 100%);
+            max-height: min(88vh, 760px);
             overflow-y: auto;
+            border-radius: 18px;
+        }
+
+        .product-detail-modal .modal-header {
+            padding: 18px 20px 12px;
+            background: linear-gradient(180deg, #fffdfa 0%, #fff 100%);
+        }
+
+        .product-detail-modal .modal-header h2 {
+            font-size: 20px;
+            line-height: 1.2;
+        }
+
+        .product-detail-modal .modal-header p {
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        .product-detail-modal .modal-content {
+            padding: 16px 20px 20px;
         }
 
         .product-detail-layout {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            gap: 24px;
-            align-items: start;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .product-detail-image-wrap {
+            display: flex;
+            justify-content: center;
+            padding-top: 2px;
         }
 
         .product-detail-media {
-            border-radius: 14px;
+            width: min(190px, 52vw);
+            height: 190px;
+            flex-shrink: 0;
+            border-radius: 16px;
             overflow: hidden;
-            aspect-ratio: 4 / 5;
             background: linear-gradient(135deg, #f0ede8, #e8e4dc);
             border: 1px solid rgba(23, 21, 29, 0.08);
+            box-shadow: 0 10px 26px rgba(23, 21, 29, 0.10);
         }
 
         .product-detail-media img {
@@ -802,37 +830,48 @@
             place-items: center;
             color: var(--muted);
             font-weight: 800;
-            font-size: 15px;
+            font-size: 13px;
+            text-align: center;
+            padding: 12px;
         }
 
         .product-detail-info {
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 12px;
+            align-items: center;
+            text-align: center;
         }
 
         .product-detail-info h2 {
-            font-size: clamp(22px, 4vw, 28px);
-            line-height: 1.15;
+            font-size: clamp(18px, 4vw, 22px);
+            line-height: 1.25;
+            width: 100%;
+        }
+
+        .product-detail-info .product-category {
+            align-self: center;
         }
 
         .product-detail-meta {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 10px;
+            width: 100%;
         }
 
         .detail-meta-item {
-            padding: 12px 14px;
+            padding: 11px 12px;
             background: #faf8f4;
             border: 1px solid var(--line);
             border-radius: 12px;
+            text-align: left;
         }
 
         .detail-meta-item span {
             display: block;
             color: var(--muted);
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.6px;
@@ -840,44 +879,51 @@
         }
 
         .detail-meta-item strong {
-            font-size: 15px;
+            font-size: 14px;
             line-height: 1.3;
-        }
-
-        .product-detail-price {
-            font-size: 24px;
-            font-weight: 900;
-            color: var(--emerald);
+            color: var(--ink);
         }
 
         .product-detail-desc-title {
-            font-size: 12px;
+            align-self: stretch;
+            text-align: left;
+            font-size: 11px;
             font-weight: 900;
             text-transform: uppercase;
             letter-spacing: 0.7px;
             color: #4d4856;
+            margin-top: 2px;
         }
 
         .product-detail-desc {
+            align-self: stretch;
+            text-align: left;
             color: var(--muted);
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 600;
-            line-height: 1.65;
+            line-height: 1.6;
             white-space: pre-wrap;
-            padding: 14px;
+            max-height: 130px;
+            overflow-y: auto;
+            padding: 12px 14px;
             background: #faf8f4;
             border: 1px solid var(--line);
             border-radius: 12px;
+            scrollbar-width: thin;
         }
 
         .product-detail-actions {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1.2fr;
             gap: 10px;
             margin-top: 4px;
+            width: 100%;
         }
 
-        .product-detail-actions .btn { min-height: 44px; }
+        .product-detail-actions .btn {
+            min-height: 42px;
+            font-size: 14px;
+        }
 
         .product-detail-actions .btn-detail {
             color: var(--emerald);
@@ -886,14 +932,27 @@
             box-shadow: none;
         }
 
+        .product-detail-actions .btn-detail:hover {
+            background: rgba(18, 108, 91, 0.06);
+            box-shadow: none;
+        }
+
         @media (max-width: 560px) {
             .product-detail-actions { grid-template-columns: 1fr; }
-            .product-detail-meta { grid-template-columns: 1fr; }
+            .product-detail-meta { grid-template-columns: 1fr 1fr; }
+            .product-detail-media {
+                width: min(170px, 46vw);
+                height: 170px;
+            }
+            .product-detail-modal .modal-content { padding: 14px 16px 18px; }
         }
 
         @media (max-width: 720px) {
-            .product-detail-layout { grid-template-columns: 1fr; }
-            .product-detail-media { aspect-ratio: 16 / 11; }
+            .product-detail-modal {
+                width: 100%;
+                max-height: 92vh;
+                border-radius: 16px 16px 0 0;
+            }
         }
 
         .form-field {
@@ -1938,7 +1997,9 @@
             </header>
             <div class="modal-content">
                 <div class="product-detail-layout">
-                    <div class="product-detail-media" id="detailImage"></div>
+                    <div class="product-detail-image-wrap">
+                        <div class="product-detail-media" id="detailImage"></div>
+                    </div>
                     <div class="product-detail-info">
                         <span class="product-category" id="detailCategory"></span>
                         <h2 id="detailName"></h2>
@@ -2379,6 +2440,6 @@
 
     <script src="./config.js"></script>
     <script src="./admin-login.js?v=9"></script>
-    <script defer src="./script.js?v=24"></script>
+    <script defer src="./script.js?v=25"></script>
 </body>
 </html>
