@@ -1,0 +1,18 @@
+{
+    "name": "Sifatli kiyimlar",
+    "short_name": "Sifatli",
+    "description": "Yuqori sifatli zamonaviy kiyimlar online do'koni",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#fbfaf7",
+    "theme_color": "#126c5b",
+    "lang": "uz",
+    "icons": [
+        {
+            "src": "/logo.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}

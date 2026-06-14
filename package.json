@@ -1,0 +1,10 @@
+{
+    "name": "sifatli-kiyimlar",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Sifatli kiyimlar — premium online kiyim do'koni",
+    "scripts": {
+        "dev": "npx serve . -p 3000",
+        "deploy:rules": "firebase deploy --only firestore:rules,storage"
+    }
+}

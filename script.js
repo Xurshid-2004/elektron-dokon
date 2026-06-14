@@ -1,4 +1,5 @@
-const firebaseConfig = {
+const APP = window.APP_CONFIG || {};
+const firebaseConfig = APP.firebase || {
     apiKey: "AIzaSyAWMPGeFwGhMj4veAGxd3NCiMzqLge-p7k",
     authDomain: "sardorapp-6fdf3.firebaseapp.com",
     projectId: "sardorapp-6fdf3",
@@ -7,11 +8,23 @@ const firebaseConfig = {
     appId: "1:261540820256:web:4397a07ad9a5801c14d345"
 };
 
-const DEFAULT_ADMIN_PASSWORD = "2014";
-let adminPassword = DEFAULT_ADMIN_PASSWORD;
+const IS_PROD = APP.env === "production";
+const DEFAULT_ADMIN_PASSWORD = APP.defaultAdminPassword || "2014";
+const ADMIN_SESSION_KEY = "sifatli_admin_session";
+const ADMIN_PWD_KEY = "sifatli_admin_pwd";
+const SESSION_HOURS = APP.adminSessionHours || 8;
+
+let adminPassword = localStorage.getItem(ADMIN_PWD_KEY) || DEFAULT_ADMIN_PASSWORD;
 
 let fb = null;
 let db = null;
+let firebaseApp = null;
+let storageApi = null;
+let firebaseStorage = null;
+let firebaseReady = false;
+let pendingProductImageFile = null;
+let pendingEditImageFile = null;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 let products = [];
 let orders = [];
 let selectedProductId = null;
@@ -28,17 +41,7 @@ const SECTION_TITLES = {
 };
 
 function bootAdminTriggers() {
-    document.addEventListener("click", (event) => {
-        const trigger = event.target.closest("#adminLoginBtn, #heroAdminBtn");
-        if (trigger) {
-            event.preventDefault();
-            try {
-                openAdminLogin();
-            } catch (error) {
-                console.error("Admin loginni ochishda xatolik:", error);
-            }
-        }
-    });
+    // admin-login.js asosiy handler — bu yerda qayta bog'lamaymiz
 }
 
 if (document.readyState === "loading") {
@@ -61,14 +64,98 @@ function boot() {
     }
 
     bootAdminTriggers();
+    showProductsLoading();
 
     try {
         initFirebase();
     } catch (error) {
         console.error("initFirebase xatosi:", error);
+        showProductsError("Ma'lumotlar yuklanmadi. Internetni tekshiring.");
     }
 
-    console.log("Sifatli kiyimlar — sayt tayyor");
+    if (hasAdminSession()) {
+        log("Admin sessiya faol");
+    }
+
+    window.addEventListener("admin:loggedin", onAdminLoggedIn);
+    window.addEventListener("admin:opened", onAdminLoggedIn);
+    window.addEventListener("admin:password-changed", (event) => {
+        adminPassword = event.detail?.password || refreshAdminPassword();
+    });
+
+    log("Sifatli kiyimlar — sayt tayyor");
+    publishAppApi();
+}
+
+function publishAppApi() {
+    window.addProduct = addProduct;
+    window.updateProduct = updateProduct;
+    window.showToast = showToast;
+    window.getFirebaseStatus = function () {
+        return {
+            ready: firebaseReady,
+            productCount: products.length,
+            projectId: firebaseConfig.projectId
+        };
+    };
+    window.dispatchEvent(new CustomEvent("app:ready"));
+}
+
+function onAdminLoggedIn() {
+    if (typeof window.switchAdminSection === "function") {
+        window.switchAdminSection("products");
+    }
+    renderStats();
+    renderAdminProducts();
+}
+
+function log(...args) {
+    if (!IS_PROD) console.log(...args);
+}
+
+function setAdminSession() {
+    const until = Date.now() + SESSION_HOURS * 60 * 60 * 1000;
+    sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify({ until }));
+}
+
+function hasAdminSession() {
+    try {
+        const raw = sessionStorage.getItem(ADMIN_SESSION_KEY);
+        if (!raw) return false;
+        const session = JSON.parse(raw);
+        if (!session?.until || Date.now() > session.until) {
+            sessionStorage.removeItem(ADMIN_SESSION_KEY);
+            return false;
+        }
+        return true;
+    } catch {
+        sessionStorage.removeItem(ADMIN_SESSION_KEY);
+        return false;
+    }
+}
+
+function clearAdminSession() {
+    sessionStorage.removeItem(ADMIN_SESSION_KEY);
+}
+
+function showProductsLoading() {
+    if (!elements.productsGrid) return;
+    elements.productsGrid.innerHTML = `
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+    `;
+}
+
+function showProductsError(message) {
+    if (!elements.productsGrid) return;
+    elements.productsGrid.innerHTML = `
+        <div class="empty-state error-state">
+            ${escapeHtml(message)}
+            <button class="btn sm" type="button" id="retryFirebaseBtn" style="margin-top:14px;">Qayta urinish</button>
+        </div>
+    `;
+    document.getElementById("retryFirebaseBtn")?.addEventListener("click", initFirebase);
 }
 
 function cacheElements() {
@@ -99,6 +186,12 @@ function cacheElements() {
         productCategory: document.getElementById("productCategory"),
         productStatus: document.getElementById("productStatus"),
         productImage: document.getElementById("productImage"),
+        productImageFile: document.getElementById("productImageFile"),
+        productImagePickBtn: document.getElementById("productImagePickBtn"),
+        productImagePreview: document.getElementById("productImagePreview"),
+        editImageFile: document.getElementById("editImageFile"),
+        editImagePickBtn: document.getElementById("editImagePickBtn"),
+        editImagePreview: document.getElementById("editImagePreview"),
         productDescription: document.getElementById("productDescription"),
         editName: document.getElementById("editName"),
         editPrice: document.getElementById("editPrice"),
@@ -128,40 +221,54 @@ function cacheElements() {
 }
 
 async function initFirebase() {
+    updateFirebaseStatus("loading");
+
+    if (location.protocol === "file:") {
+        console.warn("file:// orqali ochilgan — Firebase uchun npm run dev ishlatish tavsiya etiladi");
+    }
+
     try {
         const appModule = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
         const fsModule = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const stModule = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js");
 
         fb = fsModule;
-        const app = appModule.initializeApp(firebaseConfig);
-        db = fsModule.getFirestore(app);
+        storageApi = stModule;
+        const existingApps = appModule.getApps();
+        firebaseApp = existingApps.length ? existingApps[0] : appModule.initializeApp(firebaseConfig);
+        db = fsModule.getFirestore(firebaseApp);
+        firebaseStorage = stModule.getStorage(firebaseApp);
+        firebaseReady = true;
 
+        updateFirebaseStatus("connected");
         listenProducts();
         listenOrders();
-        listenAdminSettings();
+        window.dispatchEvent(new CustomEvent("firebase:ready"));
+        log("Firebase ulandi:", firebaseConfig.projectId);
     } catch (error) {
+        firebaseReady = false;
         console.error("Firebase init xatosi:", error);
-        showToast("Firebase ulanishida xatolik. Internetni tekshiring.", "error");
+        updateFirebaseStatus("error", error?.message || "Ulanish xatosi");
+        showProductsError("Ma'lumotlar yuklanmadi. Internetni tekshiring yoki npm run dev bilan oching.");
+        showToast("Firebase ulanmadi — internetni tekshiring", "error");
     }
 }
 
-function listenAdminSettings() {
-    if (!db || !fb) return;
+function updateFirebaseStatus(state, detail = "") {
+    const badge = document.getElementById("firebaseStatusBadge");
+    if (!badge) return;
 
-    fb.onSnapshot(
-        fb.doc(db, "settings", "admin"),
-        (snapshot) => {
-            if (snapshot.exists()) {
-                const data = snapshot.data();
-                if (data?.password) {
-                    adminPassword = data.password;
-                }
-            }
-        },
-        (error) => {
-            console.error("Admin sozlamalarini o'qishda xatolik:", error);
-        }
-    );
+    const states = {
+        loading: { text: "Firebase ulanmoqda...", className: "badge warning" },
+        connected: { text: "Firebase ulangan", className: "badge available" },
+        error: { text: "Firebase xato", className: "badge sold-out" },
+        offline: { text: "Firebase ulanmagan", className: "badge sold-out" }
+    };
+
+    const meta = states[state] || states.offline;
+    badge.textContent = meta.text;
+    badge.className = meta.className;
+    badge.title = detail || meta.text;
 }
 
 function bindById(id, event, handler) {
@@ -182,18 +289,16 @@ function bindEl(el, event, handler, name = "?") {
 }
 
 function bindEvents() {
-    bindById("adminLoginBtn", "click", openAdminLogin);
-    bindById("heroAdminBtn", "click", openAdminLogin);
-    bindById("logoutAdminBtn", "click", closeAdminDashboard);
+    bindById("logoutAdminBtn", "click", () => {
+        if (typeof window.closeAdminDashboard === "function") {
+            window.closeAdminDashboard();
+        }
+        cancelEditProduct();
+    });
     bindById("sidebarToggleBtn", "click", toggleSidebar);
     bindById("cancelEditBtn", "click", cancelEditProduct);
-    bindById("changePasswordBtn", "click", openPasswordModal);
 
-    bindEl(elements.loginForm, "submit", checkAdminPassword, "loginForm");
-    bindEl(elements.productForm, "submit", addProduct, "productForm");
-    bindEl(elements.editForm, "submit", updateProduct, "editForm");
     bindEl(elements.orderForm, "submit", submitOrder, "orderForm");
-    bindEl(elements.passwordForm, "submit", changeAdminPassword, "passwordForm");
     bindEl(elements.confirmDeleteBtn, "click", confirmDelete, "confirmDeleteBtn");
 
     bindEl(elements.productSearch, "input", (event) => {
@@ -206,9 +311,8 @@ function bindEvents() {
         renderAdminProducts();
     }, "categoryFilter");
 
-    document.querySelectorAll("[data-admin-section]").forEach((button) => {
-        button.addEventListener("click", () => switchAdminSection(button.dataset.adminSection));
-    });
+    bindImageUploadControls("product");
+    bindImageUploadControls("edit");
 
     document.querySelectorAll("[data-close-modal]").forEach((button) => {
         button.addEventListener("click", () => {
@@ -252,42 +356,53 @@ function bindEvents() {
         }
 
         const editButton = event.target.closest("[data-edit-id]");
-        if (editButton) {
+        if (editButton && !editButton.dataset.boundEdit) {
             startEditProduct(editButton.dataset.editId);
             return;
         }
 
         const deleteProductButton = event.target.closest("[data-delete-product]");
-        if (deleteProductButton) {
+        if (deleteProductButton && !deleteProductButton.dataset.boundDelete) {
             requestDelete("product", deleteProductButton.dataset.deleteProduct);
             return;
         }
 
         const deleteOrderButton = event.target.closest("[data-delete-order]");
-        if (deleteOrderButton) {
+        if (deleteOrderButton && !deleteOrderButton.dataset.boundDelete) {
             requestDelete("order", deleteOrderButton.dataset.deleteOrder);
         }
     });
 }
 
+function getSortTime(item) {
+    const ts = item?.createdAt || item?.updatedAt;
+    if (ts?.toMillis) return ts.toMillis();
+    if (ts?.seconds) return ts.seconds * 1000;
+    return 0;
+}
+
 function listenProducts() {
     if (!db || !fb) return;
 
-    const productsQuery = fb.query(fb.collection(db, "products"), fb.orderBy("createdAt", "desc"));
-
     fb.onSnapshot(
-        productsQuery,
+        fb.collection(db, "products"),
         (snapshot) => {
-            products = snapshot.docs.map((item) => ({
-                id: item.id,
-                ...item.data()
-            }));
+            products = snapshot.docs
+                .map((item) => ({
+                    id: item.id,
+                    ...item.data()
+                }))
+                .sort((a, b) => getSortTime(b) - getSortTime(a));
+            log("Firestore mahsulotlar:", products.length);
+            updateFirebaseStatus("connected", `${products.length} ta mahsulot`);
             renderProducts();
             renderAdminProducts();
             renderStats();
         },
         (error) => {
             console.error("Mahsulotlarni o'qishda xatolik:", error);
+            updateFirebaseStatus("error", error?.message || "O'qish xatosi");
+            showProductsError("Mahsulotlarni yuklashda xatolik. Internetni tekshiring.");
             showToast("Mahsulotlarni yuklashda xatolik", "error");
         }
     );
@@ -296,15 +411,15 @@ function listenProducts() {
 function listenOrders() {
     if (!db || !fb) return;
 
-    const ordersQuery = fb.query(fb.collection(db, "orders"), fb.orderBy("createdAt", "desc"));
-
     fb.onSnapshot(
-        ordersQuery,
+        fb.collection(db, "orders"),
         (snapshot) => {
-            orders = snapshot.docs.map((item) => ({
-                id: item.id,
-                ...item.data()
-            }));
+            orders = snapshot.docs
+                .map((item) => ({
+                    id: item.id,
+                    ...item.data()
+                }))
+                .sort((a, b) => getSortTime(b) - getSortTime(a));
             renderOrders();
             renderStats();
         },
@@ -316,6 +431,8 @@ function listenOrders() {
 }
 
 function renderProducts() {
+    if (!elements.productsGrid) return;
+
     elements.productsGrid.innerHTML = "";
 
     if (products.length === 0) {
@@ -326,7 +443,7 @@ function renderProducts() {
     products.forEach((product, index) => {
         const isAvailable = product.status === "mavjud";
         const card = document.createElement("article");
-        card.className = `product-card${isAvailable ? "" : " sold-out"}`;
+        card.className = `product-card is-visible${isAvailable ? "" : " sold-out"}`;
         card.style.transitionDelay = `${Math.min(index * 70, 420)}ms`;
         card.style.animationDelay = `${(index % 3) * 0.8}s`;
 
@@ -434,13 +551,15 @@ function getFilteredProducts() {
 }
 
 function renderAdminProducts() {
+    if (!elements.adminProductsTable) return;
+
     const filtered = getFilteredProducts();
     elements.adminProductsTable.innerHTML = "";
 
     if (filtered.length === 0) {
         elements.adminProductsTable.innerHTML = `
             <tr>
-                <td colspan="5" style="text-align:center; color: var(--muted); font-weight:700; padding: 28px;">
+                <td colspan="6" style="text-align:center; color: var(--muted); font-weight:700; padding: 28px;">
                     Mahsulot topilmadi
                 </td>
             </tr>
@@ -451,8 +570,10 @@ function renderAdminProducts() {
     filtered.forEach((product) => {
         const row = document.createElement("tr");
         const isAvailable = product.status === "mavjud";
+        const shortId = (product.id || "").slice(0, 8);
 
         row.innerHTML = `
+            <td><code style="font-size:12px; font-weight:800; color:var(--emerald);" title="${escapeHtml(product.id)}">${escapeHtml(shortId)}...</code></td>
             <td>
                 <div class="table-product">
                     ${product.imageUrl
@@ -469,17 +590,30 @@ function renderAdminProducts() {
             <td><span class="badge ${isAvailable ? "available" : "sold-out"}">${isAvailable ? "Mavjud" : "Tugagan"}</span></td>
             <td>
                 <div class="table-actions">
-                    <button class="icon-btn edit" type="button" data-edit-id="${escapeHtml(product.id)}" aria-label="Tahrirlash" title="Tahrirlash">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 20h9M4 20h1.5L17 8.5 14.5 6 3 17.5V20Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                    <button class="btn sm secondary table-action-btn" type="button" data-edit-id="${escapeHtml(product.id)}" aria-label="Tahrirlash" title="Tahrirlash">
+                        Tahrir
                     </button>
-                    <button class="icon-btn danger" type="button" data-delete-product="${escapeHtml(product.id)}" aria-label="O'chirish" title="O'chirish">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    <button class="btn sm danger table-action-btn" type="button" data-delete-product="${escapeHtml(product.id)}" aria-label="O'chirish" title="O'chirish">
+                        O'chir
                     </button>
                 </div>
             </td>
         `;
 
         elements.adminProductsTable.appendChild(row);
+
+        const editBtn = row.querySelector("[data-edit-id]");
+        const deleteBtn = row.querySelector("[data-delete-product]");
+
+        if (editBtn) {
+            editBtn.dataset.boundEdit = "1";
+            editBtn.addEventListener("click", () => startEditProduct(product.id));
+        }
+
+        if (deleteBtn) {
+            deleteBtn.dataset.boundDelete = "1";
+            deleteBtn.addEventListener("click", () => requestDelete("product", product.id));
+        }
     });
 }
 
@@ -511,6 +645,12 @@ function renderOrders() {
             </td>
         `;
         elements.ordersTable.appendChild(row);
+
+        const deleteBtn = row.querySelector("[data-delete-order]");
+        if (deleteBtn) {
+            deleteBtn.dataset.boundDelete = "1";
+            deleteBtn.addEventListener("click", () => requestDelete("order", order.id));
+        }
     });
 }
 
@@ -520,10 +660,10 @@ function renderStats() {
     const soldOutProducts = products.filter((p) => p.status === "tugagan").length;
     const totalOrders = orders.length;
 
-    elements.statTotalProducts.textContent = totalProducts;
-    elements.statAvailableProducts.textContent = availableProducts;
-    elements.statSoldOutProducts.textContent = soldOutProducts;
-    elements.statTotalOrders.textContent = totalOrders;
+    if (elements.statTotalProducts) elements.statTotalProducts.textContent = totalProducts;
+    if (elements.statAvailableProducts) elements.statAvailableProducts.textContent = availableProducts;
+    if (elements.statSoldOutProducts) elements.statSoldOutProducts.textContent = soldOutProducts;
+    if (elements.statTotalOrders) elements.statTotalOrders.textContent = totalOrders;
 
     if (elements.heroProductCount) {
         elements.heroProductCount.textContent = `${totalProducts}`;
@@ -531,38 +671,54 @@ function renderStats() {
 }
 
 async function addProduct(event) {
-    event.preventDefault();
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
 
-    if (!db) {
-        showToast("Firebase ulanmagan", "error");
+    if (!firebaseReady || !db || !fb) {
+        showToast("Firebase ulanmagan — sahifani yangilang yoki npm run dev bilan oching", "error");
+        elements.productFormError.textContent = "Firebase ulanmagan. Internetni tekshiring.";
         return;
     }
 
     const data = readForm("add");
     if (!data) return;
 
-    const submitBtn = elements.productForm.querySelector('button[type="submit"]');
-    submitBtn.disabled = true;
+    const submitBtn = elements.productForm?.querySelector("#addProductBtn, button[type='submit']");
+    if (submitBtn) submitBtn.disabled = true;
 
     try {
-        await fb.addDoc(fb.collection(db, "products"), {
+        const imageUrl = await resolveImageForSave("add");
+        const docRef = fb.doc(fb.collection(db, "products"));
+        const autoId = docRef.id;
+
+        await fb.setDoc(docRef, {
+            id: autoId,
             name: data.name,
             price: data.price,
             category: data.category,
-            imageUrl: data.imageUrl,
+            imageUrl: imageUrl || "",
             description: data.description,
             status: data.status,
             createdAt: fb.serverTimestamp(),
             updatedAt: fb.serverTimestamp()
         });
 
+        log("Mahsulot Firestore ga saqlandi, auto ID:", autoId);
         resetProductForm();
-        showToast("Mahsulot qo'shildi", "success");
+        switchAdminSection("products");
+        showToast(`Mahsulot saqlandi (ID: ${autoId.slice(0, 8)}...)`, "success");
     } catch (error) {
         console.error("Mahsulot qo'shishda xatolik:", error);
+        const code = error?.code || "";
+        const hint = code === "permission-denied"
+            ? "Firebase ruxsati yo'q. npm run deploy:rules"
+            : (error?.message || "Ma'lumotlarni tekshiring va qayta urinib ko'ring");
+        elements.productFormError.textContent = hint;
         showToast("Mahsulot qo'shilmadi", "error");
     } finally {
-        submitBtn.disabled = false;
+        if (submitBtn) submitBtn.disabled = false;
     }
 }
 
@@ -582,15 +738,24 @@ function startEditProduct(productId) {
     elements.editDescription.value = product.description || "";
     elements.editFormError.textContent = "";
     elements.editTitle.textContent = `"${product.name}" ni tahrirlash`;
+    pendingEditImageFile = null;
+    if (product.imageUrl) {
+        showImagePreview("edit", product.imageUrl);
+    } else {
+        clearImagePreview("edit");
+    }
 
     openModal(elements.editModal);
     setTimeout(() => elements.editName.focus(), 120);
 }
 
 async function updateProduct(event) {
-    event.preventDefault();
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
 
-    if (!db || !editingProductId) {
+    if (!db || !fb || !editingProductId) {
         showToast("Tahrirlash bekor qilindi", "error");
         return;
     }
@@ -598,43 +763,248 @@ async function updateProduct(event) {
     const data = readForm("edit");
     if (!data) return;
 
-    const submitBtn = elements.editForm.querySelector('button[type="submit"]');
-    submitBtn.disabled = true;
+    const submitBtn = elements.editForm?.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
 
     try {
+        const imageUrl = await resolveImageForSave("edit");
         await fb.updateDoc(fb.doc(db, "products", editingProductId), {
             name: data.name,
             price: data.price,
             category: data.category,
-            imageUrl: data.imageUrl,
+            imageUrl,
             description: data.description,
             status: data.status,
             updatedAt: fb.serverTimestamp()
         });
 
         editingProductId = null;
+        pendingEditImageFile = null;
+        clearImagePreview("edit");
         closeModal(elements.editModal);
         showToast("Mahsulot yangilandi", "success");
     } catch (error) {
         console.error("Mahsulot yangilashda xatolik:", error);
+        const hint = error?.code === "permission-denied"
+            ? "Firebase ruxsati yo'q"
+            : (error?.message || "Ma'lumotlarni tekshiring");
+        elements.editFormError.textContent = hint;
         showToast("Mahsulot yangilanmadi", "error");
     } finally {
-        submitBtn.disabled = false;
+        if (submitBtn) submitBtn.disabled = false;
     }
 }
 
 function cancelEditProduct() {
     editingProductId = null;
+    pendingEditImageFile = null;
     elements.editForm.reset();
     elements.editFormError.textContent = "";
+    clearImagePreview("edit");
     closeModal(elements.editModal);
 }
+
+window.cancelEditProduct = cancelEditProduct;
 
 function resetProductForm() {
     elements.productForm.reset();
     elements.productCategory.value = "Erkaklar";
     elements.productStatus.value = "mavjud";
     elements.productFormError.textContent = "";
+    pendingProductImageFile = null;
+    clearImagePreview("product");
+}
+
+function getImageFieldRefs(mode) {
+    const isEdit = mode === "edit";
+    return {
+        input: isEdit ? elements.editImage : elements.productImage,
+        file: isEdit ? elements.editImageFile : elements.productImageFile,
+        pickBtn: isEdit ? elements.editImagePickBtn : elements.productImagePickBtn,
+        preview: isEdit ? elements.editImagePreview : elements.productImagePreview
+    };
+}
+
+function clearImagePreview(mode) {
+    const { preview } = getImageFieldRefs(mode);
+    if (!preview) return;
+    if (preview.dataset.objectUrl) {
+        URL.revokeObjectURL(preview.dataset.objectUrl);
+        delete preview.dataset.objectUrl;
+    }
+    preview.removeAttribute("src");
+    preview.hidden = true;
+}
+
+function showImagePreview(mode, source) {
+    const { preview } = getImageFieldRefs(mode);
+    if (!preview) return;
+
+    clearImagePreview(mode);
+
+    let src = "";
+    if (typeof source === "string") {
+        src = source;
+    } else if (source instanceof File || source instanceof Blob) {
+        src = URL.createObjectURL(source);
+        preview.dataset.objectUrl = src;
+    }
+
+    if (!src) return;
+    preview.src = src;
+    preview.hidden = false;
+}
+
+function bindImageUploadControls(mode) {
+    const { input, file, pickBtn } = getImageFieldRefs(mode);
+    if (!input) return;
+
+    if (pickBtn && file) {
+        pickBtn.addEventListener("click", () => file.click());
+        file.addEventListener("change", () => {
+            const selected = file.files?.[0];
+            if (!selected) return;
+            if (mode === "edit") {
+                pendingEditImageFile = selected;
+            } else {
+                pendingProductImageFile = selected;
+            }
+            input.value = "";
+            showImagePreview(mode, selected);
+        });
+    }
+
+    input.addEventListener("paste", (event) => {
+        const items = event.clipboardData?.items;
+        if (!items) return;
+
+        for (const item of items) {
+            if (!item.type.startsWith("image/")) continue;
+            event.preventDefault();
+            const pastedFile = item.getAsFile();
+            if (!pastedFile) continue;
+
+            if (mode === "edit") {
+                pendingEditImageFile = pastedFile;
+            } else {
+                pendingProductImageFile = pastedFile;
+            }
+            input.value = "";
+            showImagePreview(mode, pastedFile);
+            showToast("Rasm qo'shildi — saqlashda yuklanadi", "success");
+            break;
+        }
+    });
+
+    input.addEventListener("input", () => {
+        const value = input.value.trim();
+        if (value.startsWith("data:image/")) {
+            showImagePreview(mode, value);
+            if (mode === "edit") {
+                pendingEditImageFile = null;
+            } else {
+                pendingProductImageFile = null;
+            }
+            return;
+        }
+
+        if (/^https?:\/\//i.test(value)) {
+            showImagePreview(mode, value);
+            return;
+        }
+
+        if (!value) {
+            clearImagePreview(mode);
+        }
+    });
+}
+
+function parseDataUrlImage(dataUrl) {
+    const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/);
+    if (!match) {
+        throw new Error("Nusxalangan rasm formati noto'g'ri");
+    }
+
+    const mime = match[1];
+    const binary = atob(match[2]);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+
+    const blob = new Blob([bytes], { type: mime });
+    if (blob.size > MAX_IMAGE_BYTES) {
+        throw new Error("Rasm 5MB dan katta");
+    }
+
+    const ext = mime.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
+    return { blob, ext, mime };
+}
+
+async function uploadProductImage(source) {
+    if (!storageApi || !firebaseStorage) {
+        throw new Error("Firebase Storage ulanmagan");
+    }
+
+    let blob;
+    let ext = "jpg";
+    let contentType = "image/jpeg";
+
+    if (source instanceof File || source instanceof Blob) {
+        if (!source.type?.startsWith("image/")) {
+            throw new Error("Faqat rasm fayli yuklanadi");
+        }
+        if (source.size > MAX_IMAGE_BYTES) {
+            throw new Error("Rasm 5MB dan katta");
+        }
+        blob = source;
+        contentType = source.type || contentType;
+        if (source instanceof File && source.name.includes(".")) {
+            ext = source.name.split(".").pop().toLowerCase();
+        } else {
+            ext = contentType.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
+        }
+    } else if (typeof source === "string" && source.startsWith("data:image/")) {
+        const parsed = parseDataUrlImage(source);
+        blob = parsed.blob;
+        ext = parsed.ext;
+        contentType = parsed.mime;
+    } else {
+        throw new Error("Rasm manbasi noto'g'ri");
+    }
+
+    const path = `products/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+    const imageRef = storageApi.ref(firebaseStorage, path);
+    await storageApi.uploadBytes(imageRef, blob, { contentType });
+    return storageApi.getDownloadURL(imageRef);
+}
+
+async function resolveImageForSave(mode) {
+    const isEdit = mode === "edit";
+    const pendingFile = isEdit ? pendingEditImageFile : pendingProductImageFile;
+    const { input } = getImageFieldRefs(mode);
+    const raw = input?.value.trim() || "";
+
+    if (pendingFile) {
+        showToast("Rasm Firebase Storage ga yuklanmoqda...", "info");
+        return uploadProductImage(pendingFile);
+    }
+
+    if (raw.startsWith("data:image/")) {
+        showToast("Rasm Firebase Storage ga yuklanmoqda...", "info");
+        return uploadProductImage(raw);
+    }
+
+    if (!raw) return "";
+
+    if (/^https?:\/\//i.test(raw)) {
+        if (raw.length > 2000) {
+            throw new Error("Rasm URL juda uzun");
+        }
+        return raw;
+    }
+
+    throw new Error("Rasm uchun URL kiriting, fayl tanlang yoki Ctrl+V bilan rasm qo'ying");
 }
 
 function readForm(mode) {
@@ -665,6 +1035,13 @@ function readForm(mode) {
     if (price === null) {
         errorEl.textContent = "Narx musbat raqam bo'lishi kerak";
         showToast("Narx noto'g'ri kiritildi", "error");
+        return null;
+    }
+
+    const pendingFile = mode === "edit" ? pendingEditImageFile : pendingProductImageFile;
+    if (imageUrl && !imageUrl.startsWith("data:image/") && !/^https?:\/\//i.test(imageUrl) && !pendingFile) {
+        errorEl.textContent = "Rasm uchun to'g'ri URL, fayl yoki Ctrl+V rasm kiriting";
+        showToast("Rasm formati noto'g'ri", "error");
         return null;
     }
 
@@ -708,7 +1085,7 @@ function deleteOrder(orderId) {
 }
 
 async function confirmDelete() {
-    if (!db || !deleteTarget) return;
+    if (!db || !fb || !deleteTarget) return;
 
     const { type, id } = deleteTarget;
     elements.confirmDeleteBtn.disabled = true;
@@ -719,142 +1096,46 @@ async function confirmDelete() {
             if (editingProductId === id) {
                 cancelEditProduct();
             }
-            showToast("Mahsulot o'chirildi", "info");
+            showToast("Mahsulot o'chirildi", "success");
         } else {
             await fb.deleteDoc(fb.doc(db, "orders", id));
-            showToast("Zakaz o'chirildi", "info");
+            showToast("Zakaz o'chirildi", "success");
         }
 
         closeModal(elements.deleteModal);
         deleteTarget = null;
     } catch (error) {
         console.error("O'chirishda xatolik:", error);
-        showToast("O'chirish amalga oshmadi", "error");
+        showToast(type === "product" ? "Mahsulot o'chirilmadi" : "Zakaz o'chirilmadi", "error");
     } finally {
         elements.confirmDeleteBtn.disabled = false;
     }
 }
 
 function openAdminLogin() {
-    if (!elements.loginModal) {
-        elements = elements || {};
-        elements.loginModal = document.getElementById("loginModal");
-        elements.adminPassword = document.getElementById("adminPassword");
-        elements.loginError = document.getElementById("loginError");
-    }
-
-    if (!elements.loginModal) {
-        console.error("Login modal topilmadi");
-        return;
-    }
-
-    if (elements.loginError) elements.loginError.textContent = "";
-    if (elements.adminPassword) elements.adminPassword.value = "";
-    openModal(elements.loginModal);
-    setTimeout(() => elements.adminPassword?.focus(), 120);
-}
-
-window.openAdminLogin = openAdminLogin;
-
-function checkAdminPassword(event) {
-    event.preventDefault();
-
-    if (elements.adminPassword.value.trim() === adminPassword) {
-        elements.loginError.textContent = "";
-        closeModal(elements.loginModal);
-        openAdminDashboard();
-        return;
-    }
-
-    elements.loginError.textContent = "Parol noto'g'ri";
-    showToast("Parol noto'g'ri", "error");
-}
-
-function openPasswordModal() {
-    elements.passwordForm.reset();
-    elements.passwordFormError.textContent = "";
-    openModal(elements.passwordModal);
-    setTimeout(() => elements.currentPassword.focus(), 120);
-}
-
-async function changeAdminPassword(event) {
-    event.preventDefault();
-
-    const current = elements.currentPassword.value.trim();
-    const next = elements.newPassword.value.trim();
-    const confirm = elements.confirmPassword.value.trim();
-
-    if (!current || !next || !confirm) {
-        elements.passwordFormError.textContent = "Barcha maydonlarni to'ldiring";
-        showToast("Barcha maydonlarni to'ldiring", "error");
-        return;
-    }
-
-    if (current !== adminPassword) {
-        elements.passwordFormError.textContent = "Joriy parol noto'g'ri";
-        showToast("Joriy parol noto'g'ri", "error");
-        return;
-    }
-
-    if (next.length < 4) {
-        elements.passwordFormError.textContent = "Yangi parol kamida 4 ta belgi bo'lishi kerak";
-        showToast("Parol juda qisqa", "error");
-        return;
-    }
-
-    if (next !== confirm) {
-        elements.passwordFormError.textContent = "Yangi parollar mos kelmadi";
-        showToast("Parollar mos kelmadi", "error");
-        return;
-    }
-
-    if (next === current) {
-        elements.passwordFormError.textContent = "Yangi parol joriydan farq qilishi kerak";
-        showToast("Yangi parol bir xil", "error");
-        return;
-    }
-
-    if (!db) {
-        showToast("Firebase ulanmagan", "error");
-        return;
-    }
-
-    const submitBtn = elements.passwordForm.querySelector('button[type="submit"]');
-    submitBtn.disabled = true;
-
-    try {
-        await fb.setDoc(fb.doc(db, "settings", "admin"), {
-            password: next,
-            updatedAt: fb.serverTimestamp()
-        }, { merge: true });
-
-        adminPassword = next;
-        elements.passwordFormError.textContent = "";
-        closeModal(elements.passwordModal);
-        showToast("Parol muvaffaqiyatli yangilandi", "success");
-    } catch (error) {
-        console.error("Parolni o'zgartirishda xatolik:", error);
-        elements.passwordFormError.textContent = "Parolni saqlashda xatolik";
-        showToast("Parol yangilanmadi", "error");
-    } finally {
-        submitBtn.disabled = false;
+    if (typeof window.openAdminLogin === "function") {
+        window.openAdminLogin();
     }
 }
 
 function openAdminDashboard() {
-    elements.adminDashboard.classList.add("show");
-    elements.adminDashboard.setAttribute("aria-hidden", "false");
-    document.body.classList.add("modal-open");
-    switchAdminSection("stats");
-    renderStats();
+    if (typeof window.openAdminDashboard === "function") {
+        window.openAdminDashboard();
+        onAdminLoggedIn();
+    }
 }
 
 function closeAdminDashboard() {
-    elements.adminDashboard.classList.remove("show");
-    elements.adminDashboard.setAttribute("aria-hidden", "true");
-    elements.adminSidebar.classList.remove("open");
-    document.body.classList.remove("modal-open");
+    if (typeof window.closeAdminDashboard === "function") {
+        window.closeAdminDashboard();
+    }
     cancelEditProduct();
+}
+
+function refreshAdminPassword() {
+    adminPassword = typeof window.getAdminPassword === "function"
+        ? window.getAdminPassword()
+        : (localStorage.getItem(ADMIN_PWD_KEY) || DEFAULT_ADMIN_PASSWORD);
 }
 
 function switchAdminSection(sectionName) {
@@ -868,12 +1149,14 @@ function switchAdminSection(sectionName) {
 
     const meta = SECTION_TITLES[sectionName];
     if (meta) {
-        elements.adminPageTitle.textContent = meta.title;
-        elements.adminPageDesc.textContent = meta.desc;
+        if (elements.adminPageTitle) elements.adminPageTitle.textContent = meta.title;
+        if (elements.adminPageDesc) elements.adminPageDesc.textContent = meta.desc;
     }
 
-    elements.adminSidebar.classList.remove("open");
+    elements.adminSidebar?.classList.remove("open");
 }
+
+window.switchAdminSection = switchAdminSection;
 
 function toggleSidebar() {
     elements.adminSidebar.classList.toggle("open");
@@ -929,8 +1212,8 @@ async function submitOrder(event) {
         return;
     }
 
-    if (!db) {
-        showToast("Firebase ulanmagan", "error");
+    if (!db || !fb) {
+        showToast("Server bilan bog'lanish yo'q", "error");
         return;
     }
 
@@ -958,6 +1241,11 @@ async function submitOrder(event) {
 }
 
 function showToast(message, type = "info") {
+    if (!elements.toastContainer) {
+        elements.toastContainer = document.getElementById("toastContainer");
+    }
+    if (!elements.toastContainer) return;
+
     const toast = document.createElement("div");
     toast.className = `toast ${type}`;
     toast.textContent = message;
@@ -988,7 +1276,7 @@ function closeModal(modal) {
     const hasOpenModal = Array.from(document.querySelectorAll(".modal-overlay")).some((item) =>
         item.classList.contains("show")
     );
-    const adminOpen = elements.adminDashboard.classList.contains("show");
+    const adminOpen = elements.adminDashboard?.classList.contains("show");
 
     if (!hasOpenModal && !adminOpen) {
         document.body.classList.remove("modal-open");

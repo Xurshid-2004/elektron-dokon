@@ -3,8 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Sifatli kiyimlar — yuqori sifatli zamonaviy kiyimlar online do'koni. Erkaklar, ayollar va bolalar kiyimlari. Tez zakaz, ishonchli xizmat.">
+    <meta name="keywords" content="kiyimlar, online do'kon, moda, erkaklar kiyimi, ayollar kiyimi, O'zbekiston">
+    <meta name="author" content="Sifatli kiyimlar">
+    <meta name="theme-color" content="#126c5b">
+    <meta name="robots" content="index, follow">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Sifatli kiyimlar | Premium online do'kon">
+    <meta property="og:description" content="Yuqori sifatli zamonaviy kiyimlar. Sevimli kiyimingizni tanlang va tez zakaz bering.">
+    <meta property="og:image" content="./logo.png">
+    <meta property="og:locale" content="uz_UZ">
     <link rel="icon" type="image/png" href="./logo.png">
+    <link rel="apple-touch-icon" href="./logo.png">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+    <link rel="dns-prefetch" href="https://www.gstatic.com">
     <title>Sifatli kiyimlar | Premium online do'kon</title>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "ClothingStore",
+        "name": "Sifatli kiyimlar",
+        "description": "Yuqori sifatli zamonaviy kiyimlar online do'koni",
+        "image": "./logo.png",
+        "url": "https://sardorapp.vercel.app",
+        "telephone": "+998901234567",
+        "priceRange": "$$"
+    }
+    </script>
     <style>
         :root {
             --ink: #17151d;
@@ -247,22 +274,37 @@
         }
 
         .hero-panel {
+            position: relative;
             min-height: 340px;
             padding: 22px;
             align-self: stretch;
             display: grid;
             align-content: end;
+            overflow: hidden;
             color: #fff;
             border: 1px solid rgba(255, 255, 255, 0.22);
             border-radius: var(--radius);
-            background:
-                linear-gradient(180deg, transparent, rgba(23, 21, 29, 0.72)),
-                url("https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&w=900&q=80") center/cover;
+            background: #17151d;
             box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
             animation: riseIn 800ms 120ms ease both;
         }
 
-        .hero-stat { display: grid; gap: 6px; }
+        .hero-panel-video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .hero-panel::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(23, 21, 29, 0.10), rgba(23, 21, 29, 0.78));
+        }
+
+        .hero-stat { position: relative; z-index: 1; display: grid; gap: 6px; }
         .hero-stat strong { font-size: 42px; line-height: 1; }
         .hero-stat span { color: rgba(255, 255, 255, 0.82); font-weight: 650; }
 
@@ -659,11 +701,31 @@
             font-weight: 800;
         }
 
+        .error-state {
+            color: var(--danger);
+            border-color: rgba(180, 35, 58, 0.25);
+            background: rgba(180, 35, 58, 0.06);
+        }
+
+        .skeleton-card {
+            min-height: 420px;
+            border-radius: 16px;
+            background: linear-gradient(90deg, #f0ede8 25%, #faf8f4 50%, #f0ede8 75%);
+            background-size: 200% 100%;
+            animation: skeletonShimmer 1.4s ease-in-out infinite;
+            border: 1px solid rgba(23, 21, 29, 0.06);
+        }
+
+        @keyframes skeletonShimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
         /* ── Modals ── */
         .modal-overlay {
             position: fixed;
             inset: 0;
-            z-index: 50;
+            z-index: 80;
             display: none;
             align-items: center;
             justify-content: center;
@@ -727,7 +789,7 @@
         }
 
         .form-field textarea {
-            min-height: 94px;
+            min-height: 110px;
             resize: vertical;
         }
 
@@ -747,6 +809,38 @@
             font-size: 14px;
         }
 
+        .field-hint {
+            display: block;
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 650;
+            line-height: 1.45;
+        }
+
+        .image-upload-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .image-preview {
+            display: block;
+            width: 100%;
+            max-width: 220px;
+            max-height: 160px;
+            margin-top: 10px;
+            object-fit: cover;
+            border-radius: 10px;
+            border: 1px solid var(--line);
+            box-shadow: var(--soft-shadow);
+        }
+
+        .image-preview[hidden] {
+            display: none !important;
+        }
+
         /* ── Admin Dashboard ── */
         .admin-dashboard {
             position: fixed;
@@ -754,6 +848,7 @@
             z-index: 60;
             display: none;
             background: #f4f2ee;
+            overflow: hidden;
         }
 
         .admin-dashboard.show { display: grid; }
@@ -761,7 +856,10 @@
         .admin-shell {
             display: grid;
             grid-template-columns: var(--sidebar-w) 1fr;
-            min-height: 100vh;
+            height: 100vh;
+            max-height: 100vh;
+            min-height: 0;
+            overflow: hidden;
         }
 
         .admin-sidebar {
@@ -772,6 +870,8 @@
             flex-direction: column;
             gap: 28px;
             border-right: 1px solid rgba(255, 255, 255, 0.08);
+            min-height: 0;
+            overflow-y: auto;
         }
 
         .sidebar-brand {
@@ -809,27 +909,41 @@
         }
 
         .sidebar-link {
+            width: 100%;
+            text-align: left;
             display: flex;
             align-items: center;
             gap: 12px;
             padding: 12px 14px;
-            color: rgba(255, 255, 255, 0.78);
+            color: rgba(255, 255, 255, 0.92);
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.10);
             border-radius: var(--radius);
             font-weight: 750;
             font-size: 14px;
-            transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+            appearance: none;
+            -webkit-appearance: none;
+            transition: background 180ms ease, color 180ms ease, transform 180ms ease, border-color 180ms ease;
         }
 
-        .sidebar-link:hover,
-        .sidebar-link.active {
+        .sidebar-link svg {
+            flex: 0 0 auto;
+            opacity: 0.95;
+        }
+
+        .sidebar-link:hover {
             color: #fff;
-            background: rgba(255, 255, 255, 0.10);
+            background: rgba(255, 255, 255, 0.16);
+            border-color: rgba(255, 255, 255, 0.18);
             transform: translateX(2px);
         }
 
         .sidebar-link.active {
-            background: linear-gradient(135deg, rgba(18, 108, 91, 0.55), rgba(199, 161, 90, 0.35));
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #fff;
+            background: linear-gradient(135deg, rgba(18, 108, 91, 0.85), rgba(199, 161, 90, 0.45));
+            border: 1px solid rgba(255, 255, 255, 0.20);
+            transform: translateX(2px);
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
         }
 
         .sidebar-footer {
@@ -840,6 +954,7 @@
 
         .sidebar-key-btn {
             position: relative;
+            width: 100%;
             display: grid;
             grid-template-columns: 38px 1fr 14px;
             align-items: center;
@@ -847,6 +962,9 @@
             padding: 12px 14px;
             color: #fff;
             text-align: left;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
             background: linear-gradient(135deg, rgba(199, 161, 90, 0.18), rgba(18, 108, 91, 0.20));
             border: 1px solid rgba(255, 255, 255, 0.14);
             border-radius: var(--radius);
@@ -995,6 +1113,8 @@
             display: grid;
             grid-template-rows: auto 1fr;
             min-width: 0;
+            min-height: 0;
+            overflow: hidden;
         }
 
         .admin-header {
@@ -1028,7 +1148,11 @@
 
         .admin-content {
             padding: 24px 28px 32px;
-            overflow: auto;
+            overflow-x: hidden;
+            overflow-y: auto;
+            min-height: 0;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
         }
 
         .admin-section { display: none; }
@@ -1192,10 +1316,24 @@
             background: rgba(180, 35, 58, 0.14);
         }
 
+        .badge.warning {
+            color: #92400e;
+            background: rgba(180, 83, 9, 0.14);
+        }
+
         .table-actions {
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .table-action-btn {
+            min-height: 34px;
+            padding: 0 12px;
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
         }
 
         .icon-btn {
@@ -1266,6 +1404,13 @@
         }
 
         .footer-inner strong { color: #fff; }
+
+        .footer-contact a {
+            color: rgba(255, 255, 255, 0.82);
+            transition: color 180ms ease;
+        }
+
+        .footer-contact a:hover { color: var(--gold); }
 
         .sidebar-toggle {
             display: none;
@@ -1416,7 +1561,7 @@
                     <a class="nav-link" href="#products">Mahsulotlar</a>
                     <a class="nav-link" href="#contact">Aloqa</a>
                 </div>
-                <button class="admin-trigger" type="button" id="adminLoginBtn" aria-label="Admin panelga kirish" title="Admin panel">
+                <button class="admin-trigger" type="button" id="adminLoginBtn" onclick="openAdminLogin()" aria-label="Admin panelga kirish" title="Admin panel">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <path d="M12 2.8 19 6v5.2c0 4.4-2.8 8.4-7 10-4.2-1.6-7-5.6-7-10V6l7-3.2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
                         <path d="M9.5 12.2 11.2 14l3.5-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1440,11 +1585,12 @@
                                 <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
                         </a>
-                        <button class="btn secondary" type="button" id="heroAdminBtn">Admin panel</button>
+                        <button class="btn secondary" type="button" id="heroAdminBtn" onclick="openAdminLogin()">Admin panel</button>
                     </div>
                 </div>
 
                 <aside class="hero-panel" aria-label="Do'kon statistikasi">
+                    <video class="hero-panel-video" src="./public/video.mp4" autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video>
                     <div class="hero-stat">
                         <strong id="heroProductCount">0</strong>
                         <span>katalogimizda har kuni yangilanib turuvchi mahsulotlar</span>
@@ -1563,7 +1709,7 @@
                 </button>
             </div>
             <div class="modal-content">
-                <form id="passwordForm">
+                <form id="passwordForm" novalidate>
                     <div class="form-field">
                         <label for="currentPassword">Joriy parol</label>
                         <input type="password" id="currentPassword" autocomplete="current-password" placeholder="Hozirgi parolni kiriting">
@@ -1601,7 +1747,7 @@
                 </button>
             </header>
             <div class="modal-content">
-                <form id="editForm">
+                <form id="editForm" novalidate>
                     <div class="field-grid">
                         <div class="form-field">
                             <label for="editName">Mahsulot nomi</label>
@@ -1629,8 +1775,14 @@
                             </select>
                         </div>
                         <div class="form-field full">
-                            <label for="editImage">Rasm URL</label>
-                            <input type="url" id="editImage" placeholder="https://...">
+                            <label for="editImage">Mahsulot rasmi (ixtiyoriy)</label>
+                            <div class="image-upload-row">
+                                <input type="text" id="editImage" placeholder="https://... yoki Ctrl+V bilan rasm">
+                                <input type="file" id="editImageFile" accept="image/*" hidden>
+                                <button class="btn sm secondary" type="button" id="editImagePickBtn">Rasm tanlash</button>
+                            </div>
+                            <img id="editImagePreview" class="image-preview" alt="Rasm ko'rinishi" hidden>
+                            <small class="field-hint">Internet havolasi, fayl yoki nusxalangan rasm (Ctrl+V) avtomatik saqlanadi</small>
                         </div>
                         <div class="form-field full">
                             <label for="editDescription">Tavsif</label>
@@ -1662,11 +1814,11 @@
                 </div>
 
                 <nav class="sidebar-nav" aria-label="Admin bo'limlari">
-                    <button class="sidebar-link active" type="button" data-admin-section="stats">
+                    <button class="sidebar-link" type="button" data-admin-section="stats">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 20V10M10 20V4M16 20v-8M22 20V7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                         Statistika
                     </button>
-                    <button class="sidebar-link" type="button" data-admin-section="products">
+                    <button class="sidebar-link active" type="button" data-admin-section="products">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 7h12l-1 13H7L6 7Z" stroke="currentColor" stroke-width="1.8"/><path d="M9 7V5a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="1.8"/></svg>
                         Mahsulotlar
                     </button>
@@ -1701,17 +1853,17 @@
                         <button class="sidebar-toggle" type="button" id="sidebarToggleBtn" aria-label="Menyuni ochish">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                         </button>
-                        <h1 id="adminPageTitle">Statistika</h1>
-                        <p id="adminPageDesc">Do'kon ko'rsatkichlari va yangiliklari</p>
+                        <h1 id="adminPageTitle">Mahsulotlar</h1>
+                        <p id="adminPageDesc">Mahsulotlarni qo'shing, tahrirlang va boshqaring</p>
                     </div>
                     <div class="admin-header-actions">
-                        <span class="badge available">Onlayn</span>
+                        <span class="badge warning" id="firebaseStatusBadge" title="Firebase ulanish holati">Firebase ulanmoqda...</span>
                     </div>
                 </header>
 
                 <div class="admin-content">
                     <!-- Statistika -->
-                    <section class="admin-section active" id="section-stats" data-section="stats">
+                    <section class="admin-section" id="section-stats" data-section="stats">
                         <div class="stats-grid">
                             <div class="stat-card">
                                 <strong id="statTotalProducts">0</strong>
@@ -1742,14 +1894,14 @@
                     </section>
 
                     <!-- Mahsulotlar -->
-                    <section class="admin-section" id="section-products" data-section="products">
+                    <section class="admin-section active" id="section-products" data-section="products">
                         <div class="products-layout">
                             <div class="panel-card">
                                 <div class="panel-card-header">
                                     <h3>Yangi mahsulot qo'shish</h3>
                                 </div>
                                 <div class="panel-card-body">
-                                    <form id="productForm">
+                                    <form id="productForm" novalidate onsubmit="return false;">
                                         <div class="field-grid">
                                             <div class="form-field">
                                                 <label for="productName">Mahsulot nomi</label>
@@ -1777,8 +1929,14 @@
                                                 </select>
                                             </div>
                                             <div class="form-field full">
-                                                <label for="productImage">Rasm URL</label>
-                                                <input type="url" id="productImage" placeholder="https://...">
+                                                <label for="productImage">Mahsulot rasmi (ixtiyoriy)</label>
+                                                <div class="image-upload-row">
+                                                    <input type="text" id="productImage" placeholder="https://... yoki Ctrl+V bilan rasm">
+                                                    <input type="file" id="productImageFile" accept="image/*" hidden>
+                                                    <button class="btn sm secondary" type="button" id="productImagePickBtn">Rasm tanlash</button>
+                                                </div>
+                                                <img id="productImagePreview" class="image-preview" alt="Rasm ko'rinishi" hidden>
+                                                <small class="field-hint">Internet havolasi, fayl yoki nusxalangan rasm (Ctrl+V) avtomatik saqlanadi</small>
                                             </div>
                                             <div class="form-field full">
                                                 <label for="productDescription">Tavsif</label>
@@ -1786,7 +1944,7 @@
                                             </div>
                                         </div>
                                         <div class="form-actions">
-                                            <button class="btn" type="submit">Mahsulot qo'shish</button>
+                                            <button class="btn" type="button" id="addProductBtn">Mahsulot qo'shish</button>
                                         </div>
                                         <p class="form-error" id="productFormError" role="alert"></p>
                                     </form>
@@ -1813,6 +1971,7 @@
                                         <table class="data-table">
                                             <thead>
                                                 <tr>
+                                                    <th>ID</th>
                                                     <th>Mahsulot</th>
                                                     <th>Narxi</th>
                                                     <th>Kategoriya</th>
@@ -1861,12 +2020,26 @@
 
     <footer class="site-footer" id="contact">
         <div class="container footer-inner">
-            <p><strong>Sifatli kiyimlar</strong> — zamonaviy kiyimlar online do'koni.</p>
-            <p>Sifat, ishonch va zamonaviy uslub bir joyda.</p>
+            <div>
+                <p><strong>Sifatli kiyimlar</strong> — zamonaviy kiyimlar online do'koni.</p>
+                <p>Sifat, ishonch va zamonaviy uslub bir joyda.</p>
+            </div>
+            <div class="footer-contact">
+                <p><strong>Aloqa</strong></p>
+                <p><a href="tel:+998901234567">+998 90 123 45 67</a></p>
+                <p><a href="mailto:info@sifatlikiyimlar.uz">info@sifatlikiyimlar.uz</a></p>
+            </div>
         </div>
     </footer>
 
-    <script src="./admin-login.js?v=1"></script>
-    <script type="module" src="./script.js?v=6"></script>
+    <noscript>
+        <div style="padding:24px;text-align:center;background:#b4233a;color:#fff;font-weight:700;">
+            Bu sayt ishlashi uchun JavaScript yoqilgan bo'lishi kerak.
+        </div>
+    </noscript>
+
+    <script src="./config.js"></script>
+    <script src="./admin-login.js?v=8"></script>
+    <script defer src="./script.js?v=17"></script>
 </body>
 </html>

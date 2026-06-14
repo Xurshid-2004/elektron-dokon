@@ -1,0 +1,51 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isValidProduct() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['name', 'price', 'category', 'description', 'status'])
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 120
+        && data.price is number
+        && data.price > 0
+        && data.price <= 999999999
+        && data.category is string
+        && data.category.size() > 0
+        && data.description is string
+        && data.description.size() > 0
+        && data.description.size() <= 500
+        && data.status in ['mavjud', 'tugagan']
+        && (!('imageUrl' in data) || data.imageUrl is string);
+    }
+
+    function isValidOrder() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['productId', 'productName', 'productPrice', 'customerPhone'])
+        && data.productId is string
+        && data.productName is string
+        && data.productName.size() > 0
+        && data.productPrice is number
+        && data.productPrice > 0
+        && data.customerPhone is string
+        && data.customerPhone.size() >= 7
+        && data.customerPhone.size() <= 20;
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isValidProduct();
+      allow update: if isValidProduct();
+      allow delete: if true;
+    }
+
+    match /orders/{orderId} {
+      allow read: if true;
+      allow create: if isValidOrder();
+      allow update: if false;
+      allow delete: if true;
+    }
+  }
+}
